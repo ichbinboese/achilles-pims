@@ -1,0 +1,45 @@
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+.phpunit.result.cache
+###< phpunit/phpunit ###
+
+###> symfony/phpunit-bridge ###
+.phpunit.result.cache
+/phpunit.xml
+###< symfony/phpunit-bridge ###
+
+###> symfony/asset-mapper ###
+/public/assets/
+/assets/vendor/
+###< symfony/asset-mapper ###
+
+###> symfony/webpack-encore-bundle ###
+/node_modules/
+/public/build/
+npm-debug.log
+yarn-error.log
+###< symfony/webpack-encore-bundle ###
+
+###> lexik/jwt-authentication-bundle ###
+/config/jwt/*.pem
+###< lexik/jwt-authentication-bundle ###
+/.ddev/
+/.idea/
+./ddev/web-build
+/.ddev/web-build/oracle/instantclient-basic-linux.x64-21.7.0.0.0dbru/
+/.ddev/web-build/oracle/instantclient-sdk-linux.x64-21.7.0.0.0dbru/
+/.ddev/web-build/oracle/instantclient-basic-linux.x64-21.7.0.0.0dbru.zip
+/.ddev/web-build/oracle/instantclient-sdk-linux.x64-21.7.0.0.0dbru.zip
+/.ddev/web-build/Dockerfile
+/.ddev/web-build/
