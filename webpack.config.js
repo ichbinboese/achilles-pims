@@ -1,4 +1,5 @@
 const Encore = require('@symfony/webpack-encore');
+const { defineConfig } = require('@vue/compiler-sfc')
 
 // Runtime-Umgebung setzen
 if (!Encore.isRuntimeEnvironmentConfigured()) {
@@ -29,6 +30,13 @@ Encore
     .cleanupOutputBeforeBuild()
     .enableBuildNotifications()
     .enableSourceMaps(!Encore.isProduction())
-    .enableVersioning(Encore.isProduction());
+    .enableVersioning(Encore.isProduction())
+
+
+    .configureDefinePlugin((options) => {
+      options.__VUE_OPTIONS_API__ = true
+      options.__VUE_PROD_DEVTOOLS__ = false
+      options.__VUE_PROD_HYDRATION_MISMATCH_DETAILS__ = false
+    });
 
 module.exports = Encore.getWebpackConfig();

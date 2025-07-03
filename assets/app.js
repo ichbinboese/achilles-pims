@@ -2,12 +2,17 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import axios from 'axios'
+
+axios.defaults.withCredentials = true
 
 import LoginForm from './components/LoginForm.vue'
 import Dashboard from './components/Dashboard.vue'
 import SearchForm from './components/SearchForm.vue'
 import SearchResult from './components/SearchResult.vue'
 import PimsBestellungen from "./components/PimsBestellungen.vue";
+import PimsProduct from "./components/PimsProduct.vue";
+import NotFound from "./components/NotFound.vue";
 
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
@@ -20,6 +25,8 @@ const routes = [
   { path: '/search', name: 'search', component: SearchForm, meta: { requiresAuth: true } },
   { path: '/result', name: 'result', component: SearchResult, meta: { requiresAuth: true } },
   { path: '/bestellungen', name: 'bestellungen', component: PimsBestellungen, meta: { requiresAuth: true } },
+  { path: '/product/:id', name: 'product', component: PimsProduct, meta: { requiresAuth: true } },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
 ]
 
 const router = createRouter({

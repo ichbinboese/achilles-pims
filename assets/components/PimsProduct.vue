@@ -1,101 +1,297 @@
 <template>
-  <div class="container mx-auto px-4 py-10">
-    <h2 class="text-2xl font-bold mb-6">Produkt zu Bestellung hinzufügen</h2>
+  <div class="p-6 bg-white dark:bg-stone-900 rounded shadow-md max-w-2xl mx-auto space-y-6">
+    <h2 class="text-xl font-bold text-stone-800 dark:text-stone-100">Druckbogen anlegen</h2>
 
-    <form @submit.prevent="submitProduct" class="space-y-4">
-      <FormInput label="Pinguin Order ID (orderid)" v-model="form.orderid" required type="number" />
-      <FormInput label="Produkt ID" v-model="form.product" required />
-      <FormInput label="Papier ID" v-model="form.paper" required />
-      <FormInput label="Farben ID" v-model="form.color" required />
-      <FormInput label="Auflage" v-model="form.quantity" required type="number" />
-      <FormInput label="Breite (mm)" v-model="form.width" required type="number" />
-      <FormInput label="Höhe (mm)" v-model="form.height" required type="number" />
-      <FormInput label="Format ID (optional)" v-model="form.format" />
-      <FormInput label="Kommentar" v-model="form.comment" />
-      <FormInput label="Dauer (1-5)" v-model="form.duration" required type="number" />
-      <FormInput label="Druckbereit? (Y/N/A)" v-model="form.readytoprint" />
+    <!-- Produkt Auswahl -->
+    <div>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Bestellung</label>
+      <select v-model="form.product" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <option value="">Bitte wählen...</option>
+        <option v-for="p in produkte" :key="p.code" :value="p.code">
+          {{ p.bezeichnung }}
+        </option>
+      </select>
+    </div>
 
-      <label class="block font-semibold text-sm text-stone-700 dark:text-stone-300">Vorderseite:</label>
-      <input type="file" @change="handleFile($event, 'file_front')" class="mb-3" required />
+    <!-- Papier Auswahl -->
+    <div>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Papier</label>
+      <select v-model="form.paper" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <option value="">Bitte wählen...</option>
+        <option v-for="p in papiere" :key="p.code" :value="p.code">
+          {{ p.bezeichnung }}
+        </option>
+      </select>
+    </div>
 
-      <label class="block font-semibold text-sm text-stone-700 dark:text-stone-300">Rückseite (optional):</label>
-      <input type="file" @change="handleFile($event, 'file_back')" class="mb-3" />
+    <!-- Farben Auswahl -->
+    <div>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Farben</label>
+      <select v-model="form.color" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <option value="">Bitte wählen...</option>
+        <option v-for="f in farben" :key="f.code" :value="f.code">
+          {{ f.bezeichnung }}
+        </option>
+      </select>
+    </div>
 
-      <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full">
-        Produkt senden
-      </button>
-    </form>
+    <!-- Kaschierungn Auswahl -->
+    <div>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kaschierung</label>
+      <select v-model="form.wvkaschierung" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <option value="">Bitte wählen...</option>
+        <option v-for="k in kaschierungen" :key="k.code" :value="k.code">
+          {{ k.bezeichnung }}
+        </option>
+      </select>
+    </div>
+
+    <div class="flex flex-col">
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Endformat</label>
+      <div class="flex gap-4">
+        <div class="w-1/2">
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Breite</label>
+          <input type="number" v-model="form.width" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
+        </div>
+        <div class="w-1/2">
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Höhe</label>
+          <input type="number" v-model="form.height" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          v-model="form.wvstanzen"
+          value="stanzen_werkzeugvorhanden"
+          class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
+        />
+        <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          Datei hat Stanzlinien
+        </label>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          v-model="form.wvuvlack"
+          value="uvlack_part_1"
+          class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
+        />
+        <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          UV-Lack
+        </label>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          v-model="form.wvpraegenheiss"
+          value="praegenheiss_gold_werkzeugvorhanden_10"
+          class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
+        />
+        <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          Heißfolienprägung
+        </label>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          v-model="form.wvpraegenblind"
+          value="praegenblind_werkzeugvorhanden"
+          class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
+        />
+        <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          Blindprägung
+        </label>
+      </div>
+    </div>
+
+
+
+    <div>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kommentar an Pinguin</label>
+      <textarea v-model="form.comment" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" rows="3"></textarea>
+    </div>
+
+
+    <div class="space-y-6">
+      <!-- Upload Vorderseite -->
+      <div
+        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800"
+        :class="[
+    frontDragOver || fileFront ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600'
+  ]"
+        @dragover.prevent="frontDragOver = true"
+        @dragleave.prevent="frontDragOver = false"
+        @drop.prevent="handleDrop($event, 'front')"
+      >
+        <p class="text-sm text-stone-600 dark:text-stone-300 mb-2">
+          Datei für <strong>Vorderseite</strong> (PDF, Pflichtfeld)
+        </p>
+        <input
+          type="file"
+          accept="application/pdf"
+          class="hidden"
+          ref="fileFrontInput"
+          @change="handleFileChange($event, 'front')"
+        />
+        <button @click="triggerFile('front')" class="text-orange-600 font-medium underline">Datei auswählen</button>
+        <p v-if="fileFront" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ fileFront.name }} als Datei hochladen</p>
+      </div>
+
+      <!-- Upload Rückseite -->
+      <div
+        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800"
+        :class="[
+    backDragOver || fileBack ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600'
+  ]"
+        @dragover.prevent="backDragOver = true"
+        @dragleave.prevent="backDragOver = false"
+        @drop.prevent="handleDrop($event, 'back')"
+      >
+        <p class="text-sm text-stone-600 dark:text-stone-300 mb-2">
+          Datei für <strong>Rückseite</strong> (PDF, optional)
+        </p>
+        <input
+          type="file"
+          accept="application/pdf"
+          class="hidden"
+          ref="fileBackInput"
+          @change="handleFileChange($event, 'back')"
+        />
+        <button @click="triggerFile('back')" class="text-orange-600 font-medium underline">Datei auswählen</button>
+        <p v-if="fileBack" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ fileBack.name }} als Datei hochladen</p>
+      </div>
+
+    </div>
+
+    <button @click="submitProduct" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded">
+      Produkt senden
+    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useToast } from 'vue-toastification'
-import FormInput from './FormInput.vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import md5 from 'md5'
+import { useToast } from 'vue-toastification'
 
 const toast = useToast()
 
-const form = reactive({
-  orderid: '',
-  uniqueid: '',
+const form = ref({
   product: '',
   paper: '',
   color: '',
-  quantity: 1000,
-  width: 210,
-  height: 297,
-  format: '',
+  wvkaschierung: '',
+  width: '',
+  height: '',
+  wvstanzen: '',
+  wvuvlack: '',
   comment: '',
-  duration: 3,
-  readytoprint: 'Y',
-  file_front: null,
-  file_back: null
+  fileFront: null,
+  fileBack: null,
+  wvpraegenheiss: '',
+  wvpraegenblind: '',
 })
 
-const handleFile = (e, key) => {
-  form[key] = e.target.files[0]
-}
+const produkte = ref([])
+const papiere = ref([])
+const farben = ref([])
+const kaschierungen = ref([])
+
+// Drag state
+const frontDragOver = ref(false)
+const backDragOver = ref(false)
+
+// File state
+const fileFront = ref(null)
+const fileBack = ref(null)
+
+const fileFrontInput = ref(null)
+const fileBackInput = ref(null)
+
+const emit = defineEmits(['update:fileFront', 'update:fileBack'])
+
+onMounted(async () => {
+  try {
+    const [prod, pap, farb, kasch] = await Promise.all([
+      axios.get('/api/pims-produkt'),
+      axios.get('/api/pims-papier'),
+      axios.get('/api/pims-druckfarben'),
+      axios.get('/api/pims-kaschierung')
+    ])
+    produkte.value = prod.data
+    papiere.value = pap.data
+    farben.value = farb.data
+    kaschierungen.value = kasch.data
+  } catch (err) {
+    toast.error('Fehler beim Laden der Auswahldaten')
+  }
+})
 
 const submitProduct = async () => {
-  const payload = new FormData()
-  const idString = `${form.orderid}-${form.product}-${form.paper}-${Date.now()}`
-  form.uniqueid = md5(idString)
-
-  for (const [key, value] of Object.entries(form)) {
-    if (value !== null && value !== '') {
-      payload.append(key, value)
-    }
-  }
-
   try {
-    const { data } = await axios.post(
-      'https://pims-api.stage.printdays.net/v1/pimsProduct.php?key=123',
-      payload,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
-        }
-      }
-    )
+    const payload = new FormData()
+    payload.append('product', form.value.product)
+    payload.append('paper', form.value.paper)
+    payload.append('color', form.value.color)
+    payload.append('wvkaschierung', form.value.kaschierung)
+    payload.append('width', form.value.width)
+    payload.append('height', form.value.height)
+    payload.append('wvstanzen', form.value.wvstanzen)
+    payload.append('wvuvlack', form.value.wvuvlack)
+    payload.append('comment', form.value.comment)
+    payload.append('wvpraegenheiss', form.value.wvpraegenheiss)
+    payload.append('wvpraegenblind', form.value.wvpraegenblind)
+    if (fileFront.value) payload.append('file_front', fileFront.value)
+    if (fileBack.value) payload.append('file_back', fileBack.value)
 
-    if (data.success === 1) {
-      toast.success(`Produkt erfolgreich erstellt: ${data.productnr}`)
+    const response = await axios.post('/api/proxy/pims-product', payload)
+
+    if (response.data.success) {
+      toast.success(`Produkt erfolgreich angelegt: ${response.data.productnr}`)
     } else {
-      toast.error('Erstellung fehlgeschlagen.')
+      toast.error('Fehler bei der Produkterstellung')
     }
   } catch (error) {
-    console.error(error)
-    toast.error('Fehler beim Senden des Produkts')
+    toast.error('Fehler beim Senden der Daten')
+  }
+}
+
+function triggerFile(type) {
+  if (type === 'front') fileFrontInput.value?.click()
+  if (type === 'back') fileBackInput.value?.click()
+}
+
+function handleFileChange(event, type) {
+  const file = event.target.files[0]
+  if (!file || file.type !== 'application/pdf') return
+
+  if (type === 'front') {
+    fileFront.value = file
+    emit('update:fileFront', file)
+  } else if (type === 'back') {
+    fileBack.value = file
+    emit('update:fileBack', file)
+  }
+}
+
+function handleDrop(event, type) {
+  const file = event.dataTransfer.files[0]
+  if (!file || file.type !== 'application/pdf') return
+
+  if (type === 'front') {
+    frontDragOver.value = false
+    fileFront.value = file
+    emit('update:fileFront', file)
+  } else if (type === 'back') {
+    backDragOver.value = false
+    fileBack.value = file
+    emit('update:fileBack', file)
   }
 }
 </script>
-
-<style scoped>
-input:focus {
-  outline: none;
-  border-color: #fb923c;
-}
-</style>

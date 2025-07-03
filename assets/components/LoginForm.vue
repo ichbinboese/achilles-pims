@@ -61,18 +61,25 @@ const rememberMe = ref(false)
 const router = useRouter()
 const toast = useToast()
 
-const login = () => {
-  axios.post('/api/login', {
-    email: email.value,
-    password: password.value,
-    remember: rememberMe.value
-  }).then(response => {
-    localStorage.setItem('token', response.data.token ?? 'demo')
+const login = async () => {
+  try {
+    const response = await axios.post('/api/login', {
+      email: email.value,
+      password: password.value
+    }, {
+      withCredentials: true // wichtig für Session-Cookie!
+    })
+
     toast.success('Erfolgreich angemeldet!')
+    localStorage.setItem('token', 'true')
+
+    // ab hier darf Axios Cookies mitsenden
+    axios.defaults.withCredentials = true
+
     router.push('/dashboard')
-  }).catch(error => {
+  } catch (error) {
     toast.error('Login fehlgeschlagen: Benutzer oder Passwort falsch.')
-    console.error(error)
-  })
+    console.error('Login Error:', error)
+  }
 }
 </script>

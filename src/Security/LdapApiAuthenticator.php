@@ -13,6 +13,11 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class LdapApiAuthenticator extends AbstractAuthenticator
 {
@@ -21,10 +26,13 @@ class LdapApiAuthenticator extends AbstractAuthenticator
     private string $searchDn;
     private string $searchPassword;
     private string $uidKey;
-    private LoggerInterface $logger;
 
-    public function __construct(LoggerInterface $logger)
-    {
+    public function __construct(
+        LoggerInterface $logger,
+        TokenStorageInterface $tokenStorage,
+        RequestStack $requestStack,
+        EventDispatcherInterface $eventDispatcher
+    ) {
         $this->ldap = Ldap::create('ext_ldap', [
             'host' => $_ENV['LDAP_BASE_ADDRESS'],
             'port' => 389,
@@ -39,6 +47,9 @@ class LdapApiAuthenticator extends AbstractAuthenticator
         $this->searchPassword = $_ENV['LDAP_SEARCH_PASSWORD'];
         $this->uidKey = $_ENV['LDAP_UID_KEY'] ?? 'sAMAccountName';
         $this->logger = $logger;
+        $this->tokenStorage = $tokenStorage;
+        $this->requestStack = $requestStack;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function supports(Request $request): ?bool
@@ -83,6 +94,7 @@ class LdapApiAuthenticator extends AbstractAuthenticator
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?JsonResponse
     {
         $user = $token->getUser();
+
         return new JsonResponse([
             'status' => 'ok',
             'username' => $user instanceof UserInterface ? $user->getUserIdentifier() : null,

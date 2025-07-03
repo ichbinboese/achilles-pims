@@ -58,7 +58,9 @@
 
       <!-- User + Logout + Darkmode -->
       <div class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
-        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">Angemeldet</span>
+        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">
+          Angemeldet als {{ ldapUser }}
+        </span>
 
         <!-- Darkmode Toggle -->
         <button
@@ -84,9 +86,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import axios from "axios";
 
 const isOpen = ref(false)
 const isDark = ref(false)
+const ldapUser = ref('')
 const auth = useAuthStore()
 
 // Toggle dark mode class on <html>
@@ -98,12 +102,23 @@ function toggleDarkMode() {
 }
 
 // Restore state on load
-onMounted(() => {
+onMounted(async () => {
   isDark.value = localStorage.getItem('darkmode') === '1'
-  if (isDark.value) {
-    document.documentElement.classList.add('dark')
+  if (isDark.value) document.documentElement.classList.add('dark')
+
+  try {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`
+    const { data } = await axios.get('/api/ldap-user', { withCredentials: true })
+    console.log('LDAP-User:', data) // 🐞 Hier wird das Ergebnis in der Browser-Konsole ausgegeben
+    if (data.status === 'ok') {
+      ldapUser.value = data.firstname || data.username
+    }
+  } catch (error) {
+    console.warn('LDAP-User konnte nicht geladen werden')
+    console.error('Fehler beim Laden des LDAP-Benutzers:', error)
   }
 })
+
 
 function handleLogout() {
   auth.token = null

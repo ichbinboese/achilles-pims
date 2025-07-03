@@ -3,6 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Main\Bestellungen;
+use Symfony\Component\Ldap\Ldap;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -109,6 +112,72 @@ class IndexController extends AbstractController
         $em->flush();
 
         return $this->json(['status' => 'created', 'id' => $bestellung->getId()]);
+    }
+
+    #[Route('/api/ldap-user', name: 'api_ldap_user', methods: ['GET'])]
+    public function getCurrentLdapUser(TokenStorageInterface $tokenStorage): JsonResponse
+    {
+        $token = $tokenStorage->getToken();
+
+        if (!$token || !$token->getUser() instanceof UserInterface) {
+            return new JsonResponse([
+                'status' => 'unauthenticated',
+                'message' => 'Kein authentifizierter Benutzer gefunden.',
+            ], JsonResponse::HTTP_UNAUTHORIZED);
+        }
+
+        $username = $token->getUser()->getUserIdentifier();
+
+        try {
+            $ldap = Ldap::create('ext_ldap', [
+                'host' => $_ENV['LDAP_BASE_ADDRESS'],
+                'port' => 389,
+                'encryption' => 'none',
+                'options' => [
+                    'protocol_version' => 3,
+                    'referrals' => false,
+                ],
+            ]);
+
+            $ldap->bind($_ENV['LDAP_SEARCH_DN'], $_ENV['LDAP_SEARCH_PASSWORD']);
+
+            $query = $ldap->query($_ENV['LDAP_BASE_DN'], sprintf('(%s=%s)', $_ENV['LDAP_UID_KEY'] ?? 'sAMAccountName', $username));
+            $results = $query->execute();
+
+            if (count($results) === 0) {
+                return new JsonResponse(['status' => 'not_found'], JsonResponse::HTTP_NOT_FOUND);
+            }
+
+            $entry = $results[0];
+
+            return new JsonResponse([
+                'status' => 'ok',
+                'username' => $username,
+                'email' => $entry->getAttribute('mail')[0] ?? null,
+                'firstname' => $entry->getAttribute('givenName')[0] ?? null,
+                'lastname' => $entry->getAttribute('sn')[0] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            return new JsonResponse([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/api/me', name: 'api_me')]
+    public function me(TokenStorageInterface $tokenStorage): JsonResponse
+    {
+        $user = $tokenStorage->getToken()?->getUser();
+
+        if (!$user instanceof UserInterface) {
+            return $this->json(['status' => 'unauthenticated'], 401);
+        }
+
+        return $this->json([
+            'status' => 'ok',
+            'username' => $user->getUserIdentifier(),
+        ]);
     }
 
 }

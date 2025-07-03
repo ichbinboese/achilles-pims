@@ -51,7 +51,7 @@ yarn dev      # oder yarn build für Produktion
 Die Kommunikation mit PIMS erfolgt via Basic Auth und multipart POST:
 
 ```http
-Authorization: Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw==
+Authorization: Basic xxxxxxxxxxxxxxxxxxxxxxx
 Content-Type: multipart/form-data
 ```
 
