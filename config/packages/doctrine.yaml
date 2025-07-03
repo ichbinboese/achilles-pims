@@ -1,0 +1,52 @@
+doctrine:
+    dbal:
+        default_connection: default
+        connections:
+            default:
+                # configure these for your database server
+                url: '%env(resolve:DATABASE_URL)%'
+                driver: 'pdo_mysql'
+                server_version: '5.7'
+                charset: utf8mb4
+            oracle:
+                # configure these for your database server
+                url: '%env(resolve:DATABASE_ORACLE_URL)%'
+                driver: 'oci8'
+                server_version: '11'
+                charset: 'AL32UTF8'
+            easy:
+                # configure these for your database server
+                url: '%env(resolve:DATABASE_EASY_URL)%'
+                driver: 'pdo_mysql'
+                server_version: '5.4'
+                charset: utf8mb4
+    orm:
+        default_entity_manager: default
+        entity_managers:
+            default:
+                connection: default
+                mappings:
+                    Main:
+                        is_bundle: false
+                        type: attribute
+                        dir: '%kernel.project_dir%/src/Entity/Main'
+                        prefix: 'App\Entity\Main'
+                        alias: Main
+            oracle:
+                connection: oracle
+                mappings:
+                    Oracle:
+                        is_bundle: false
+                        type: attribute
+                        dir: '%kernel.project_dir%/src/Entity/Oracle'
+                        prefix: 'App\Entity\Oracle'
+                        alias: Oracle
+            easy:
+                connection: easy
+                mappings:
+                    Easy:
+                        is_bundle: false
+                        type: attribute
+                        dir: '%kernel.project_dir%/src/Entity/Easy'
+                        prefix: 'App\Entity\Easy'
+                        alias: Easy
