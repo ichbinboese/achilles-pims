@@ -4,7 +4,7 @@
 
     <form @submit.prevent="submitProduct" class="space-y-4">
       <FormInput label="Pinguin Order ID (orderid)" v-model="form.orderid" required type="number" />
-      <FormInput label="Produkt ID (pdxxx)" v-model="form.product" required />
+      <FormInput label="Produkt ID" v-model="form.product" required />
       <FormInput label="Papier ID" v-model="form.paper" required />
       <FormInput label="Farben ID" v-model="form.color" required />
       <FormInput label="Auflage" v-model="form.quantity" required type="number" />

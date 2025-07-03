@@ -21,6 +21,11 @@ class PimsProdukt
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $achillesmapping = null;
 
+    public function __toString(): string
+    {
+        return $this->bezeichnung;
+    }
+
     public function getId(): int
     {
         return $this->id;
