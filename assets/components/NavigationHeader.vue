@@ -2,8 +2,8 @@
   <nav class=" bg-gradient-to-r from-amber-50 to-amber-60 dark:to-stone-950 px-4 py-3 flex items-center justify-between flex-wrap border-b-2 border-orange-600 text-stone-800">
     <!-- Logo -->
     <router-link to="/" class="text-xl font-semibold flex items-center space-x-4">
-      <span><img src="https://www.achilles.de/wp-content/uploads/ACH_Logo_Wortbildmarke_CMYK.png" class="max-h-10" /></span>
-      <span><img src="https://pinguindruck.de/load/images/pinguindruck.svg" class="h-10" /></span>
+      <span><img src="https://www.achilles.de/wp-content/uploads/ACH_Logo_Wortbildmarke_CMYK.png" alt="achilles-logo" class="max-h-10" /></span>
+      <span><img src="https://pinguindruck.de/load/images/pinguindruck.svg" class="h-10" alt="pinguin-logo" /></span>
             <span class="ml-20">Druckbogenbestellsystem</span>
     </router-link>
 
@@ -58,7 +58,7 @@
 
       <!-- User + Logout + Darkmode -->
       <div class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
-        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1"  v-if="loadingLdap">Lade Benutzerdaten...</span>
+        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1" v-if="loadingLdap">Lade Benutzerdaten...</span>
         <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1" v-else>Angemeldet als {{ ldapFirstname }} {{ ldapLastname }}</span>
 
         <!-- Darkmode Toggle -->
@@ -120,11 +120,7 @@ onMounted(async () => {
   }
 })
 
-
 function handleLogout() {
-  auth.token = null
-  localStorage.removeItem('token')
-  delete axios.defaults.headers.common['Authorization']
-  window.location.href = '/'
+  auth.logout()
 }
 </script>

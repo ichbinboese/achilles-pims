@@ -2,59 +2,61 @@
   <div class="p-6 bg-white dark:bg-stone-900 rounded shadow-md max-w-2xl mx-auto space-y-6">
     <h2 class="text-xl font-bold text-stone-800 dark:text-stone-100">Druckbogen anlegen</h2>
 
-    <!-- Produkt Auswahl -->
-    <div>
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Bestellung</label>
-      <select v-model="form.product" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
-        <option value="">Bitte wählen...</option>
-        <option v-for="p in produkte" :key="p.code" :value="p.code">
-          {{ p.bezeichnung }}
-        </option>
-      </select>
-    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Bestellung -->
+      <div>
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Bestellung</label>
+        <select v-model="form.product" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+          <option value="">Bitte wählen...</option>
+          <option v-for="p in produkte" :key="p.code" :value="p.code">
+            {{ p.bezeichnung }}
+          </option>
+        </select>
+      </div>
 
-    <!-- Papier Auswahl -->
-    <div>
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Papier</label>
-      <select v-model="form.paper" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
-        <option value="">Bitte wählen...</option>
-        <option v-for="p in papiere" :key="p.code" :value="p.code">
-          {{ p.bezeichnung }}
-        </option>
-      </select>
-    </div>
+      <!-- Papier Auswahl -->
+      <div>
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Papier</label>
+        <select v-model="form.paper" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+          <option value="">Bitte wählen...</option>
+          <option v-for="p in papiere" :key="p.code" :value="p.code">
+            {{ p.bezeichnung }}
+          </option>
+        </select>
+      </div>
 
-    <!-- Farben Auswahl -->
-    <div>
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Farben</label>
-      <select v-model="form.color" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
-        <option value="">Bitte wählen...</option>
-        <option v-for="f in farben" :key="f.code" :value="f.code">
-          {{ f.bezeichnung }}
-        </option>
-      </select>
-    </div>
+      <!-- Farben Auswahl -->
+      <div>
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Farben</label>
+        <select v-model="form.color" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+          <option value="">Bitte wählen...</option>
+          <option v-for="f in farben" :key="f.code" :value="f.code">
+            {{ f.bezeichnung }}
+          </option>
+        </select>
+      </div>
 
-    <!-- Kaschierungn Auswahl -->
-    <div>
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kaschierung</label>
-      <select v-model="form.wvkaschierung" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
-        <option value="">Bitte wählen...</option>
-        <option v-for="k in kaschierungen" :key="k.code" :value="k.code">
-          {{ k.bezeichnung }}
-        </option>
-      </select>
+      <!-- Kaschierung Auswahl -->
+      <div>
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kaschierung</label>
+        <select v-model="form.wvkaschierung" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+          <option value="">Bitte wählen...</option>
+          <option v-for="k in kaschierungen" :key="k.code" :value="k.code">
+            {{ k.bezeichnung }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <div class="flex flex-col">
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Endformat</label>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Endformat (zur schnelleren Dateiprüfung)</label>
       <div class="flex gap-4">
         <div class="w-1/2">
-          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Breite</label>
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Breite (in mm)</label>
           <input type="number" v-model="form.width" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
         </div>
         <div class="w-1/2">
-          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Höhe</label>
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Höhe (in mm)</label>
           <input type="number" v-model="form.height" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
         </div>
       </div>
@@ -110,13 +112,10 @@
       </div>
     </div>
 
-
-
     <div>
       <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kommentar an Pinguin</label>
-      <textarea v-model="form.comment" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" rows="3"></textarea>
+      <textarea v-model="form.comment" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" rows="1"></textarea>
     </div>
-
 
     <div class="space-y-6">
       <!-- Upload Vorderseite -->
