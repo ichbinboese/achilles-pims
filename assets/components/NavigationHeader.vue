@@ -58,9 +58,8 @@
 
       <!-- User + Logout + Darkmode -->
       <div class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
-        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">
-          Angemeldet als {{ ldapUser }}
-        </span>
+        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1"  v-if="loadingLdap">Lade Benutzerdaten...</span>
+        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1" v-else>Angemeldet als {{ ldapFirstname }} {{ ldapLastname }}</span>
 
         <!-- Darkmode Toggle -->
         <button
@@ -90,7 +89,8 @@ import axios from "axios";
 
 const isOpen = ref(false)
 const isDark = ref(false)
-const ldapUser = ref('')
+const ldapFirstname = ref('')
+const ldapLastname = ref('')
 const auth = useAuthStore()
 
 // Toggle dark mode class on <html>
@@ -107,11 +107,12 @@ onMounted(async () => {
   if (isDark.value) document.documentElement.classList.add('dark')
 
   try {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`
+    axios.defaults.withCredentials = true
     const { data } = await axios.get('/api/ldap-user', { withCredentials: true })
     console.log('LDAP-User:', data) // 🐞 Hier wird das Ergebnis in der Browser-Konsole ausgegeben
     if (data.status === 'ok') {
-      ldapUser.value = data.firstname || data.username
+      ldapFirstname.value = data.firstname
+      ldapLastname.value = data.lastname
     }
   } catch (error) {
     console.warn('LDAP-User konnte nicht geladen werden')

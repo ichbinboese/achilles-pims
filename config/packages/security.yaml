@@ -10,14 +10,6 @@ security:
                 uid_key: '%env(LDAP_UID_KEY)%'
 
     firewalls:
-        # Login-Endpunkt: kein stateless!
-        login:
-            pattern: ^/api/login
-            stateless: false
-            custom_authenticators:
-                - App\Security\LdapApiAuthenticator
-
-        # Hauptfirewall für alle anderen Routen
         main:
             lazy: true
             stateless: false
@@ -28,9 +20,9 @@ security:
                 path: /api/logout
             remember_me:
                 secret: '%kernel.secret%'
-                lifetime: 604800   # optional: 7 Tage
+                lifetime: 604800
                 path: /
-                secure: false      # in dev evtl. deaktivieren
+                secure: false
                 name: REMEMBERME
 
     access_control:

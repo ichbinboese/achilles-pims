@@ -4,20 +4,19 @@ import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
 
-axios.defaults.withCredentials = true
-
 import LoginForm from './components/LoginForm.vue'
 import Dashboard from './components/Dashboard.vue'
 import SearchForm from './components/SearchForm.vue'
 import SearchResult from './components/SearchResult.vue'
 import PimsBestellungen from "./components/PimsBestellungen.vue";
 import PimsProduct from "./components/PimsProduct.vue";
-import NotFound from "./components/NotFound.vue";
+import NotFound from "./components/NotFound.vue"
 
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import './styles/app.css'
 
+axios.defaults.withCredentials = true
 
 const routes = [
   { path: '/', component: LoginForm },
@@ -34,23 +33,33 @@ const router = createRouter({
   routes,
 })
 
+const app = createApp(App)
+const pinia = createPinia()
+app.use(pinia)
+
+import { useAuthStore } from './stores/auth'
+const auth = useAuthStore()
+auth.initializeToken()
+
+// Auth-Header bei vorhandenem Token setzen
+if (auth.token) {
+  axios.defaults.headers.common['Authorization'] = 'Bearer ' + auth.token
+}
+
+// Navigation Guard
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = !!localStorage.getItem('token')
-  if (to.path !== '/' && !isAuthenticated) {
+  const auth = useAuthStore()
+  const isAuthenticated = !!auth.token
+  if (to.meta.requiresAuth && !isAuthenticated) {
     next('/')
   } else {
     next()
   }
 })
 
-const app = createApp(App)
-const pinia = createPinia()
-app.use(pinia)
 app.use(router)
-app.mount('#app')
 
 app.use(Toast, {
-  // 💡 Position oben zentriert (alternativ: 'top-right', 'top-left', etc.)
   position: 'top-center',
   timeout: 5000,
   closeOnClick: true,
@@ -59,3 +68,5 @@ app.use(Toast, {
   showCloseButtonOnHover: false,
   hideProgressBar: false
 })
+
+app.mount('#app')

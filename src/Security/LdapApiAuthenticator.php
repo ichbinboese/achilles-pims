@@ -27,6 +27,11 @@ class LdapApiAuthenticator extends AbstractAuthenticator
     private string $searchPassword;
     private string $uidKey;
 
+    private LoggerInterface $logger;
+    private TokenStorageInterface $tokenStorage;
+    private RequestStack $requestStack;
+    private EventDispatcherInterface $eventDispatcher;
+
     public function __construct(
         LoggerInterface $logger,
         TokenStorageInterface $tokenStorage,
@@ -93,6 +98,13 @@ class LdapApiAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?JsonResponse
     {
+        $this->tokenStorage->setToken($token);
+
+        $this->eventDispatcher->dispatch(new InteractiveLoginEvent(
+            $this->requestStack->getCurrentRequest(),
+            $token
+        ));
+
         $user = $token->getUser();
 
         return new JsonResponse([

@@ -51,35 +51,34 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
+import { useAuthStore } from '../stores/auth'
+import axios from 'axios'
 
 const email = ref('')
 const password = ref('')
 const rememberMe = ref(false)
-const router = useRouter()
+
 const toast = useToast()
+const router = useRouter()
+const auth = useAuthStore()
 
 const login = async () => {
   try {
-    const response = await axios.post('/api/login', {
-      email: email.value,
-      password: password.value
-    }, {
-      withCredentials: true // wichtig für Session-Cookie!
-    })
+    await auth.login(email.value, password.value)
 
-    toast.success('Erfolgreich angemeldet!')
-    localStorage.setItem('token', 'true')
-
-    // ab hier darf Axios Cookies mitsenden
-    axios.defaults.withCredentials = true
-
-    router.push('/dashboard')
-  } catch (error) {
+    // ✨ Token aus dem Store gesetzt – Auth-Header korrekt
+    const { data } = await axios.get('/api/ldap-user')
+    if (data.status === 'ok') {
+      toast.success('Login erfolgreich')
+      router.push('/dashboard')  // ← Weiterleitung hier
+    } else {
+      toast.error('Session konnte nicht validiert werden')
+    }
+  } catch (err) {
     toast.error('Login fehlgeschlagen: Benutzer oder Passwort falsch.')
-    console.error('Login Error:', error)
+    console.error(err)
   }
 }
 </script>

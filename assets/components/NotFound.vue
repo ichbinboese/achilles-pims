@@ -8,7 +8,7 @@
       Die von dir angeforderte Seite existiert nicht oder wurde verschoben.
     </p>
     <router-link
-      to="/"
+      to="/dashboard"
       class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-5 rounded-full transition"
     >
       Zur Startseite
