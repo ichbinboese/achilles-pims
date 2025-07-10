@@ -114,6 +114,39 @@ class IndexController extends AbstractController
         return $this->json(['status' => 'created', 'id' => $bestellung->getId()]);
     }
 
+
+    #[Route('/api/easy-search', name: 'api_easy_search', methods: ['GET'])]
+    public function easySearch(Request $request, ManagerRegistry $doctrine): JsonResponse
+    {
+        $em     = $doctrine->getManager('easy');
+        $conn   = $em->getConnection();
+        $orderNr = $request->query->get('orderNr', '');
+
+        //  → exakt matchen:
+        $sql =  <<<SQL
+                    SELECT
+                        ooa.oxid,
+                        oo.oxordernr,
+                        ooa.oxtitle,
+                        ooa.oxartnum,
+                        ooa.oxshortdesc,
+                        ooa.ddposition,
+                        ooa.oxamount
+                    FROM easy_live.oxorderarticles AS ooa
+                    JOIN easy_live.oxorder AS oo
+                      ON oo.oxid = ooa.oxorderid
+                    WHERE oo.oxordernr LIKE :orderNr
+                      AND ooa.oxstorno = 0
+                SQL;
+
+        $stmt   = $conn->prepare($sql);
+        $result = $stmt->executeQuery([
+            'orderNr' => '%' . $orderNr,
+        ]);
+
+        return $this->json($result->fetchAllAssociative());
+    }
+
     #[Route('/api/ldap-user', name: 'api_ldap_user', methods: ['GET'])]
     public function getCurrentLdapUser(TokenStorageInterface $tokenStorage): JsonResponse
     {

@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto mt-10 px-4">
+  <div class="container max-w-2xl mx-auto mt-10 px-4 bg-white">
     <div v-if="loading" class="text-stone-600">Lade Daten...</div>
 
     <div v-else-if="error" class="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4">
@@ -46,11 +46,11 @@
     </div>
 
     <!-- Anzeige der gewählten Bestellung -->
-    <div v-if="selected" class="mt-8 bg-stone-100 dark:bg-stone-800 p-5">
+    <div v-if="selected" class="mt-8 bg-white dark:bg-stone-800 p-5">
       <h3 class="text-xl font-semibold mb-4 dark:text-stone-300">
         Details zur Position {{ selected.bestpos }} von {{ selected.bestnr }}:
       </h3>
-      <table class="w-1/2 table-auto border border-stone-300 bg-white dark:bg-stone-900 overflow-hidden text-sm dark:text-stone-300">
+      <table class="table-auto border border-stone-300 bg-white dark:bg-stone-900 overflow-hidden text-sm dark:text-stone-300">
         <tbody>
         <tr class="border-b">
           <th class="text-left p-2 w-1/5">Firma:</th>
@@ -82,6 +82,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import axios from 'axios'
 import md5 from 'crypto-js/md5'
 import { useToast } from 'vue-toastification'
@@ -107,10 +108,10 @@ const submitOrder = async () => {
   const form = new FormData()
   form.append('uniqueid', uniqueId)
   form.append('title', 'firma') // oder 'herr', 'frau' je nach Auswahl
-  form.append('name', 'Pinguindruck GmbH')
-  form.append('street', 'Marienburger Str. 16')
-  form.append('postcode', '10405')
-  form.append('locale', 'Berlin')
+  form.append('name', 'Achilles Präsentationsprodukte GmbH')
+  form.append('street', 'Bruchkampweg 40')
+  form.append('postcode', '29227')
+  form.append('locale', 'Celle')
   form.append('country', 'deutschland')
   form.append('mail', 'me@somewhere.org')
   form.append('vat', 0.19)
@@ -125,7 +126,14 @@ const submitOrder = async () => {
     })
 
     if (response.data.success === 1) {
-      toast.success(`Bestellung erfolgreich erstellt: ${response.data.ordernr}`)
+            toast.success(`Bestellung erfolgreich erstellt: ${response.data.ordernr}`)
+            router.push({
+              name: 'PimsOrder',
+              params: {
+                bestnr:   selected.value.bestnr,
+                position: selected.value.bestpos
+              }
+            })
     } else {
       toast.error('Bestellung konnte nicht erstellt werden.')
     }
@@ -141,6 +149,12 @@ onMounted(async () => {
   try {
     const { fiNr, bestnr } = route.query
     const response = await axios.get('/api/bestellung', { params: { fiNr, bestnr } })
+    const auth = useAuthStore()
+
+    // User laden
+    if (!auth.user) {
+      await auth.fetchUser()
+    }
 
     results.value = response.data
 

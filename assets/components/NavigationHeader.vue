@@ -39,7 +39,7 @@
         </li>
         <li>
           <router-link
-            to="/search-easy"
+            to="/easy-form"
             class="block py-2 px-3 hover:bg-stone-400 hover:text-stone-800 rounded-full dark:hover:bg-stone-300 text-stone-100 bg-orange-600"
           >
             Bestellung von easyOrdner.de
@@ -92,6 +92,7 @@ const isDark = ref(false)
 const ldapFirstname = ref('')
 const ldapLastname = ref('')
 const auth = useAuthStore()
+const loadingLdap = ref(false)
 
 // Toggle dark mode class on <html>
 function toggleDarkMode() {
@@ -99,6 +100,15 @@ function toggleDarkMode() {
   const root = document.documentElement
   root.classList.toggle('dark', isDark.value)
   localStorage.setItem('darkmode', isDark.value ? '1' : '0')
+}
+
+async function fetchLdap() {
+  loadingLdap.value = true
+  try {
+    // … dein Call …
+  } finally {
+    loadingLdap.value = false
+  }
 }
 
 // Restore state on load

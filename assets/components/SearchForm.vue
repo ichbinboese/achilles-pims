@@ -1,6 +1,6 @@
 <template>
   <div class="container mx-auto mt-12">
-    <div class="max-w-md mx-auto border-2 border-orange-600 dark:bg-stone-900 bg-white shadow-md rounded-md p-6">
+    <div class="max-w-md mx-auto border-2 dark:bg-stone-900 bg-white shadow-md  p-6">
       <h2 class="text-2xl font-semibold mb-4 text-center dark:text-stone-300">Bestellung suchen</h2>
       <form @submit.prevent="submitForm" class="space-y-4">
         <div class="relative w-full">

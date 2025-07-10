@@ -1,5 +1,4 @@
 const Encore = require('@symfony/webpack-encore');
-const { defineConfig } = require('@vue/compiler-sfc')
 
 // Runtime-Umgebung setzen
 if (!Encore.isRuntimeEnvironmentConfigured()) {
@@ -22,7 +21,7 @@ Encore
 
     .configureWatchOptions((watchOptions) => {
       watchOptions.poll = 250; // Nur wenn Docker/DDEV nötig
-      watchOptions.ignored = /node_modules|public|\.git|\.idea|\.vscode/;;
+      watchOptions.ignored = /node_modules|public|\.git|\.idea|\.vscode/;
     })
 
     .enablePostCssLoader() // 👈 WICHTIG für Tailwind!
@@ -33,10 +32,12 @@ Encore
     .enableVersioning(Encore.isProduction())
 
 
-    .configureDefinePlugin((options) => {
-      options.__VUE_OPTIONS_API__ = true
-      options.__VUE_PROD_DEVTOOLS__ = false
-      options.__VUE_PROD_HYDRATION_MISMATCH_DETAILS__ = false
-    });
+    .configureDefinePlugin(definitions => {
+      // Wichtig: Werte als JSON.stringify, damit sie als Literale im Code landen
+      definitions['__VUE_OPTIONS_API__']                    = JSON.stringify(true);
+      definitions['__VUE_PROD_DEVTOOLS__']                  = JSON.stringify(false);
+      definitions['__VUE_PROD_HYDRATION_MISMATCH_DETAILS__'] = JSON.stringify(false);
+    })
+
 
 module.exports = Encore.getWebpackConfig();

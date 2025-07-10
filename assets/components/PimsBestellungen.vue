@@ -1,6 +1,6 @@
 <template>
-  <div class="container mx-auto py-8 px-4">
-    <h1 class="text-2xl font-bold mb-6">PIMS Bestellungen Übersicht</h1>
+  <div class="container max-w-2xl mx-auto mt-10 px-4 bg-white dark:bg-stone-800">
+    <h1 class="text-2xl font-bold py-6">PIMS Bestellungen Übersicht</h1>
 
     <!-- Suchfeld und Filter -->
     <div class="flex flex-col md:flex-row md:items-center gap-4 mb-4">
@@ -8,7 +8,7 @@
         v-model="search"
         type="text"
         placeholder="Suche nach Bestellnummer..."
-        class="w-full md:w-1/3 rounded border border-stone-300 p-2 dark:bg-stone-800 dark:border-stone-600 dark:text-white"
+        class="w-full md:w-1/2 rounded border border-stone-300 p-2 dark:bg-stone-800 dark:border-stone-600 dark:text-white rounded-full px-4"
       />
       <button
         @click="fetchBestellungen"
@@ -65,7 +65,7 @@
       <div class="text-sm text-stone-600 dark:text-stone-300">
         Seite {{ page }} von {{ totalPages }}
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 mb-6">
         <button
           @click="prevPage"
           :disabled="page === 1"

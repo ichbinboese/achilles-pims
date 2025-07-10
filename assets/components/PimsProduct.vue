@@ -5,8 +5,8 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Bestellung -->
       <div>
-        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Bestellung</label>
-        <select v-model="form.product" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Bestellung</label>
+        <select v-model="form.product" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required>
           <option value="">Bitte wählen...</option>
           <option v-for="p in produkte" :key="p.code" :value="p.code">
             {{ p.bezeichnung }}
@@ -16,8 +16,8 @@
 
       <!-- Papier Auswahl -->
       <div>
-        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Papier</label>
-        <select v-model="form.paper" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Papier</label>
+        <select v-model="form.paper" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required>
           <option value="">Bitte wählen...</option>
           <option v-for="p in papiere" :key="p.code" :value="p.code">
             {{ p.bezeichnung }}
@@ -27,8 +27,8 @@
 
       <!-- Farben Auswahl -->
       <div>
-        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Farben</label>
-        <select v-model="form.color" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-3">Farben</label>
+        <select v-model="form.color" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required>
           <option value="">Bitte wählen...</option>
           <option v-for="f in farben" :key="f.code" :value="f.code">
             {{ f.bezeichnung }}
@@ -38,8 +38,8 @@
 
       <!-- Kaschierung Auswahl -->
       <div>
-        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kaschierung</label>
-        <select v-model="form.wvkaschierung" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white">
+        <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Kaschierung</label>
+        <select v-model="form.wvkaschierung" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required>
           <option value="">Bitte wählen...</option>
           <option v-for="k in kaschierungen" :key="k.code" :value="k.code">
             {{ k.bezeichnung }}
@@ -49,20 +49,24 @@
     </div>
 
     <div class="flex flex-col">
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Endformat (zur schnelleren Dateiprüfung)</label>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Endformat (zur schnelleren Dateiprüfung)</label>
       <div class="flex gap-4">
-        <div class="w-1/2">
-          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Breite (in mm)</label>
-          <input type="number" v-model="form.width" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
+        <div class="w-1/3">
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Breite (in mm):</label>
+          <input type="number" v-model="form.width" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required/>
         </div>
-        <div class="w-1/2">
-          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Höhe (in mm)</label>
-          <input type="number" v-model="form.height" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" />
+        <div class="w-1/3">
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Höhe (in mm):</label>
+          <input type="number" v-model="form.height" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required />
+        </div>
+        <div class="w-1/3">
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Auflage:</label>
+          <input type="number" v-model="form.quantity" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required/>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 gap-4 ml-4 w-2/3">
       <div class="flex items-center space-x-2">
         <input
           type="checkbox"
@@ -113,14 +117,14 @@
     </div>
 
     <div>
-      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1">Kommentar an Pinguin</label>
-      <textarea v-model="form.comment" class="w-full p-2 border rounded dark:bg-stone-800 dark:text-white" rows="1"></textarea>
+      <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Kommentar an Pinguin</label>
+      <textarea v-model="form.comment" class="w-full p-2 border rounded-3xl dark:bg-stone-800 dark:text-white px-4" rows="1"></textarea>
     </div>
 
     <div class="space-y-6">
       <!-- Upload Vorderseite -->
       <div
-        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800"
+        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
         :class="[
     frontDragOver || fileFront ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600'
   ]"
@@ -144,7 +148,7 @@
 
       <!-- Upload Rückseite -->
       <div
-        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800"
+        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
         :class="[
     backDragOver || fileBack ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600'
   ]"
@@ -168,7 +172,7 @@
 
     </div>
 
-    <button @click="submitProduct" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded">
+    <button @click="submitProduct" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 rounded-full px-4">
       Produkt senden
     </button>
   </div>
@@ -186,6 +190,7 @@ const form = ref({
   paper: '',
   color: '',
   wvkaschierung: '',
+  quantity: '',
   width: '',
   height: '',
   wvstanzen: '',
@@ -240,6 +245,7 @@ const submitProduct = async () => {
     payload.append('color', form.value.color)
     payload.append('wvkaschierung', form.value.kaschierung)
     payload.append('width', form.value.width)
+    payload.append('quantity', form.value.quantity)
     payload.append('height', form.value.height)
     payload.append('wvstanzen', form.value.wvstanzen)
     payload.append('wvuvlack', form.value.wvuvlack)
@@ -252,12 +258,12 @@ const submitProduct = async () => {
     const response = await axios.post('/api/proxy/pims-product', payload)
 
     if (response.data.success) {
-      toast.success(`Produkt erfolgreich angelegt: ${response.data.productnr}`)
+      toast.success(`Produkt erfolgreich angelegt: ${response.data.orderid}`)
     } else {
-      toast.error('Fehler bei der Produkterstellung')
+      toast.error('Fehler bei der Produkterstellung:' + response.data.message)
     }
   } catch (error) {
-    toast.error('Fehler beim Senden der Daten')
+    toast.error('Fehler beim Senden der Daten:' + error.message )
   }
 }
 

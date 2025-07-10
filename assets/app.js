@@ -8,9 +8,12 @@ import LoginForm from './components/LoginForm.vue'
 import Dashboard from './components/Dashboard.vue'
 import SearchForm from './components/SearchForm.vue'
 import SearchResult from './components/SearchResult.vue'
+import PimsOrder from "./components/PimsOrder.vue";
 import PimsBestellungen from "./components/PimsBestellungen.vue";
 import PimsProduct from "./components/PimsProduct.vue";
 import NotFound from "./components/NotFound.vue"
+import EasyForm from "./components/EasyForm.vue"
+import EasyResult from "./components/EasyResult.vue"
 
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
@@ -24,8 +27,11 @@ const routes = [
   { path: '/search', name: 'search', component: SearchForm, meta: { requiresAuth: true } },
   { path: '/result', name: 'result', component: SearchResult, meta: { requiresAuth: true } },
   { path: '/bestellungen', name: 'bestellungen', component: PimsBestellungen, meta: { requiresAuth: true } },
-  { path: '/product/:id', name: 'product', component: PimsProduct, meta: { requiresAuth: true } },
+  { path: '/order/:bestnr/:position', name: 'order', component: PimsOrder, props: true, meta: { requiresAuth: true } },
+  { path: '/order/:bestnr/:position/product/:orderid/:ordernr', name: 'product', component: PimsProduct, props: true, meta: { requiresAuth: true } },
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
+  { path: '/easy-result', name: 'easy-result',  component: EasyResult, meta: { requiresAuth: true }  },
+  { path: '/easy-form', name: 'easy-form',  component: EasyForm, meta: { requiresAuth: true }  },
 ]
 
 const router = createRouter({
@@ -38,6 +44,7 @@ const pinia = createPinia()
 app.use(pinia)
 
 import { useAuthStore } from './stores/auth'
+
 const auth = useAuthStore()
 auth.initializeToken()
 
@@ -66,7 +73,7 @@ app.use(Toast, {
   pauseOnHover: true,
   draggable: true,
   showCloseButtonOnHover: false,
-  hideProgressBar: false
+  hideProgressBar: false,
+  containerClassName: 'toast-container-custom'
 })
-
 app.mount('#app')

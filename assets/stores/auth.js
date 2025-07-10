@@ -5,7 +5,7 @@ import axios from 'axios'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || null)
-  const router = useRouter()
+  const user  = ref(null)
 
   // Stelle sicher, dass Axios den Token verwendet
   if (token.value) {
@@ -21,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    const router = useRouter();
     token.value = null
     localStorage.removeItem('token')
     delete axios.defaults.headers.common['Authorization']
@@ -35,6 +36,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, login, logout, initializeToken }
+  async function fetchUser() {
+    // hol dir den angemeldeten User (muss im Symfony-Backend /api/user existieren)
+    const { data } = await axios.get('/api/user')
+    user.value = data
+  }
+
+  return {
+    token,
+    user,
+    login,
+    logout,
+    initializeToken,
+    fetchUser
+  }
 
 })

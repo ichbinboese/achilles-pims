@@ -21,6 +21,9 @@ class PimsFormat
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $achillesmapping = null;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $easymapping = null;
+
     public function __toString(): string
     {
         return $this->bezeichnung;
@@ -61,6 +64,17 @@ class PimsFormat
     public function setAchillesmapping(?string $achillesmapping): self
     {
         $this->achillesmapping = $achillesmapping;
+        return $this;
+    }
+
+    public function getEasymapping(): ?string
+    {
+        return $this->easymapping;
+    }
+
+    public function setEasymapping(?string $easymapping): self
+    {
+        $this->easymapping = $easymapping;
         return $this;
     }
 }

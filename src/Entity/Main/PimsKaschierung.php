@@ -21,6 +21,9 @@ class PimsKaschierung
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $achillesmapping = null;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $easysmapping = null;
+
     public function __toString(): string
     {
         return $this->bezeichnung;
@@ -61,6 +64,17 @@ class PimsKaschierung
     public function setAchillesmapping(?string $achillesmapping): self
     {
         $this->achillesmapping = $achillesmapping;
+        return $this;
+    }
+
+    public function getEasysmapping(): ?string
+    {
+        return $this->easysmapping;
+    }
+
+    public function setEasysmapping(?string $easysmapping): self
+    {
+        $this->easysmapping = $easysmapping;
         return $this;
     }
 }

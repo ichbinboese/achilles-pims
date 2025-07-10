@@ -20,3 +20,9 @@ import NavigationHeader from './components/NavigationHeader.vue'
 
 const currentYear = computed(() => new Date().getFullYear())
 </script>
+
+<style>
+.toast-container-custom {
+  top: 100px !important;
+}
+</style>

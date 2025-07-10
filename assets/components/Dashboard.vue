@@ -21,7 +21,7 @@
         </p>
         <router-link
           to="/search"
-          class="inline-block bg-orange-600 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
+          class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
         >
           Zur Bestellung
         </router-link>
@@ -34,8 +34,8 @@
           Starten Sie direkt mit einer Bestellung von easyOrdner.de.
         </p>
         <router-link
-          to="/search-easy"
-          class="inline-block bg-orange-600 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
+          to="/easy-form"
+          class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
         >
           Zur Bestellung
         </router-link>
@@ -49,7 +49,7 @@
         </p>
         <router-link
           to="/bestellungen"
-          class="inline-block bg-orange-600 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
+          class="inline-block bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-full transition duration-200"
         >
           Zur Bestellsuche
         </router-link>

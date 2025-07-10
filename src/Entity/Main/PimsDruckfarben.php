@@ -18,6 +18,9 @@ class PimsDruckfarben
     #[ORM\Column(type: 'string', length: 255)]
     private string $achillesmapping;
 
+    #[ORM\Column(type: 'string', length: 255)]
+    private string $easymapping;
+
     public function getCode(): ?string
     {
         return $this->code;
@@ -53,6 +56,17 @@ class PimsDruckfarben
     public function setBezeichnung(string $bezeichnung): static
     {
         $this->bezeichnung = $bezeichnung;
+        return $this;
+    }
+
+    public function getEasymapping(): ?string
+    {
+        return $this->easymapping;
+    }
+
+    public function setEasymapping(string $easymapping): static
+    {
+        $this->easymapping = $easymapping;
         return $this;
     }
 }
