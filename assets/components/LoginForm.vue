@@ -1,6 +1,6 @@
 <template>
   <div class="flex justify-center mt-16">
-    <div class="w-full max-w-md bg-white dark:bg-stone-900 p-8 border-2 border-orange-600 rounded shadow">
+    <div class="w-full max-w-md bg-white dark:bg-stone-900 p-8 border-2 shadow">
       <h2 class="text-2xl font-bold text-center mb-6 dark:text-stone-200">Pinguin Bestellsystem</h2>
       <form @submit.prevent="login">
         <div class="mb-4">
@@ -66,16 +66,24 @@ const auth = useAuthStore()
 
 const login = async () => {
   try {
-    await auth.login(email.value, password.value)
+    // 1) Einloggen – setzt (oder liefert) den Token
+    await auth.login(email.value, password.value, { remember: rememberMe.value })
 
-    // ✨ Token aus dem Store gesetzt – Auth-Header korrekt
-    const { data } = await axios.get('/api/ldap-user')
-    if (data.status === 'ok') {
-      toast.success('Login erfolgreich')
-      router.push('/dashboard')  // ← Weiterleitung hier
+    // 2) (optional – Interceptor reicht eigentlich aus)
+    axios.defaults.headers.common.Authorization = 'Bearer ' + auth.token
+
+    // 3) LDAP-User JETZT laden (nachdem der Token sicher gesetzt ist)
+    if (auth.fetchLdapUser) {
+      await auth.fetchLdapUser()
     } else {
-      toast.error('Session konnte nicht validiert werden')
+      const { data } = await axios.get('/api/ldap-user')
+      if (data?.status !== 'ok') throw new Error('Session konnte nicht validiert werden')
+      // ggf. auth.setLdapUser(data)
     }
+
+    // 4) Erfolg + Redirect
+    toast.success('Login erfolgreich')
+    router.replace('/dashboard')
   } catch (err) {
     toast.error('Login fehlgeschlagen: Benutzer oder Passwort falsch.')
     console.error(err)

@@ -1,114 +1,173 @@
-# 🐧 Pinguin-Druckbogen-Bestellsystem
+# Achilles PIMS
 
-Ein webbasiertes System zur Verwaltung und Übertragung von Druckaufträgen an die PIMS API von Pinguin-Druck, basierend auf Symfony 6,4 (PHP 8.3) und Vue 3 mit TailwindCSS.
-
----
-
-## 🚀 Features
-
-- 🔍 Bestellungen suchen (b7 / easyOrdner)
-- ✅ Positionen auswählen und Details einsehen
-- 📦 PIMS-Bestellung auslösen (`pimsOrder.php`)
-- 📄 Produktdaten zu Bestellung erfassen (`pimsProduct.php`)
-- 🔒 Login via Auth Store (optional via Local Storage Token)
-- 📂 Datei-Uploads: Vorder- / Rückseite
-- 🧠 Validierung + Duplikatvermeidung via `uniqueid` (MD5)
-- 🔄 API-Kommunikation mit `axios` + Toast-Meldungen
+Ein modernes Symfony 6.4 + Vue 3 + Tailwind Projekt für Bestellverwaltung und Schnittstellen-Integration.
 
 ---
 
-## 🧰 Tech Stack
+## Inhaltsverzeichnis
 
-| Bereich           | Technologie                   |
-|------------------|-------------------------------|
-| Backend          | Symfony 6.4, Doctrine ORM     |
-| Frontend         | Vue 3, Composition API        |
-| Styling          | TailwindCSS 3                 |
-| Auth / API       | `axios`,                      |
-| Build-Tool       | Webpack Encore                |
-| DB-Unterstützung | MariaDB + Oracle via Doctrine |
+- [Features](#features)
+- [Systemvoraussetzungen](#systemvoraussetzungen)
+- [Installation](#installation)
+- [Konfiguration](#konfiguration)
+- [Frontend-Entwicklung (Vue + Tailwind)](#frontend-entwicklung-vue--tailwind)
+- [API & Authentifizierung](#api--authentifizierung)
+- [Eigene UI-Komponenten (Best Practice)](#eigene-ui-komponenten-best-practice)
+- [Tests](#tests)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+- [Mitwirkende](#mitwirkende)
+- [Lizenz](#lizenz)
 
 ---
 
-## 📦 Installation
+## Features
+
+- **Symfony 6.4 Backend** mit REST-APIs (Bestellungen, Produkte, Authentifizierung)
+- **Vue 3 Frontend:** Moderne Komponentenstruktur, Routing, State-Management
+- **TailwindCSS** für einheitliches, responsives UI-Design
+- **API Authentifizierung** via Bearer-Token
+- **Wiederverwendbare UI-Komponenten** für Buttons, Cards, Links etc.
+- **Dark-Mode-Unterstützung**
+- **Datenbank:** Doctrine ORM (MySQL/PostgreSQL/SQLite)
+
+---
+
+## Systemvoraussetzungen
+
+- PHP >= 8.3
+- Composer
+- Node.js >= 18, npm/yarn
+- Datenbank (MySQL, PostgreSQL oder SQLite)
+- Git
+
+---
+
+## Installation
 
 ```bash
-# Backend installieren
+git clone https://github.com/ichbinboese/achilles-pims.git
+cd achilles-pims
+
+# Abhängigkeiten installieren
 composer install
+npm install
 
-# Frontend installieren
-yarn install
-yarn dev      # oder yarn build für Produktion
+# .env anpassen (z.B. DB-Zugang, APP_API_TOKEN)
+cp .env .env.local
+
+# Datenbank anlegen & Migrationen ausführen
+php bin/console doctrine:database:create
+php bin/console doctrine:migrations:migrate
+
+# Assets/Vue/Tailwind bauen
+npm run dev   # für Entwicklung
+npm run build # für Produktion
+
+# Lokalen Webserver starten (z.B. symfony cli oder PHP built-in)
+symfony serve
+# oder
+php -S localhost:8000 -t public
+```
+## Frontend-Entwicklung (Vue + Tailwind)
+
+Das Frontend liegt unter `/assets` und ist in folgende Bereiche strukturiert:
+
+- `/assets/components/elements/` – für Buttons, Cards, AppLink, usw.
+- `/assets/components/pages/` – für Seiten-Views
+- `/assets/styles/` – globale Styles, eigene Tailwind-Klassen mit `@apply` (z.B. `.btn-orange`)
+
+### Entwicklung starten
+
+```bash
+npm run dev
+```
+Öffne dann deinen Browser unter: http://localhost:8000
+
+## Eigene Komponenten verwenden
+Beispiel für einen eigenen Button als Vue-Komponente:
+
+```html
+<!-- assets/components/elements/Button.vue -->
+<template>
+  <button class="px-4 py-2 rounded-2xl shadow bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">
+    <slot />
+  </button>
+</template>
+```
+Mehr Beispiele findest du unter /assets/components/elements/.
+
+## API & Authentifizierung
+### Authentifizierung per Bearer-Token
+Alle schreibenden API-Requests benötigen einen gültigen Auth-Token im Header:
+```dotenv
+Authorization: Bearer DEIN_API_TOKEN
+```
+Neue Tokens kannst du per Symfony-Command, Admin-Endpoint oder direkt in der Datenbank erzeugen.
+
+Beispiel (fetch in JS):
+
+```js
+fetch('/api/pims-bestellungen', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer DEIN_API_TOKEN'
+  },
+  body: JSON.stringify(data)
+})
 ```
 
-> .env Datei kopieren:
-> `.env.local` → mit Zugangsdaten zu `DATABASE_URL`, `DATABASE_EASY_URL`, `DATABASE_ORACLE_URL`
-
----
-
-## 🔗 API-Konfiguration
-
-Die Kommunikation mit PIMS erfolgt via Basic Auth und multipart POST:
-
-```http
-Authorization: Basic xxxxxxxxxxxxxxxxxxxxxxx
-Content-Type: multipart/form-data
+#### Beispiel: API-Endpunkt Bestellungen anlegen
+```php
+#[Route('/api/pims-bestellungen', name: 'pims_bestellungen_create', methods: ['POST'])]
+public function create(Request $request, EntityManagerInterface $em, ValidatorInterface $validator): JsonResponse
+{
+    // ... Auth-Token-Prüfung und Logik siehe src/Controller/...
+}
 ```
 
-Verwendete Endpunkte:
+## Eigene UI-Komponenten (Best Practice)
+- Wiederverwendbare Komponenten (z.B. `<Button>`, `<AppLink>`, `<Card>`) liegen unter `/assets/components/elements/`
+- Styling wird zentral in diesen Komponenten gepflegt.
+- Erweiterbar mit Props (Farbe, Größe, etc.)
+- Siehe Beispiele im Code-Repository.
 
-- `https://pims-api.stage.printdays.net/v1/pimsOrder.php`
-- `https://pims-api.stage.printdays.net/v1/pimsProduct.php`
-- `https://pims-api.stage.printdays.net/v1/pimsParcel.php`
+## Tests
+- Backend: PHPUnit (tests/)
+- Frontend: Optionale Unit-Tests mit z.B. Vitest/Jest
 
----
-
-## 🗂 Projektstruktur
-
-```txt
-├── src/
-│   ├── Entity/
-│   │   ├── Main/               # Symfony-Entities (z. B. Bestellungen, Produkte)
-│   │   ├── Easy/               # Zusätzliche DB-Verbindung
-│   ├── Controller/
-│   │   ├── Api/                # JSON-API für Vue
-│   │   ├── IndexController.php
-│
-├── assets/
-│   ├── components/             # Vue-Komponenten
-│   │   ├── FormInput.vue
-│   │   ├── FormInputSelect.vue
-│   ├── views/                  # Seitenkomponenten
-│
-├── templates/
-│   └── base.html.twig          # Einbettungspunkt für App.vue
-│
-├── public/
-│   └── build/                  # Webpack Encore Output
+Beispiel Backend-Test:
+```bash
+php bin/phpunit
 ```
 
----
+## Deployment
 
-## 🧪 Beispielablauf
+Production Build:
 
-1. Suche starten → `/api/bestellung?fiNr=114&bestnr=114BE2501343`
-2. Position wählen
-3. `uniqueid` generieren aus `bestnr + bestpos + zähler`
-4. Bestellung anlegen → `pimsOrder.php`
-5. Produkte anfügen → `pimsProduct.php`
+```bash
+npm run build
+php bin/console cache:clear --env=prod
+```
 
----
+Empfohlen:
 
-## ✅ ToDos / Weiterentwicklung
+- .env.local mit Produktionsdaten ausstatten
+- Webserver auf /public zeigen lassen
+- HTTPS erzwingen
 
-- [ ] Authentifizierung gegen internes ACL-System
-- [ ] Fortschrittsanzeige pro Produkt
-- [ ] Dateiuploads in Backend verifizieren
-- [ ] PDF-Preview nach Upload anzeigen
-- [ ] Statusabruf der PIMS-Produkte
+## Troubleshooting
 
----
+- **Fehlende Abhängigkeiten:** <br>Prüfe, ob alle PHP- und JS-Abhängigkeiten installiert sind.
+- **Tailwind Klassen werden nicht angewendet:** <br>Prüfe, ob npm run dev/build ohne Fehler läuft.
 
-## 📜 Lizenz
+- **API gibt 401 oder 403:** <br>Prüfe Auth-Token in .env.local und Request-Header.
 
-MIT © Werner Achilles GmbH & Co. KG – Benjamin Böse
+- **Probleme mit Datenbank:** <br>Prüfe Datenbankzugang und führe ggf. Migrationen erneut aus.
+
+## Mitwirkende
+- Benjamin Böse
+
+## Lizenz
+Dieses Projekt steht unter der MIT-Lizenz – siehe LICENSE.

@@ -1,6 +1,6 @@
 <template>
   <div class="container mx-auto mt-12">
-    <div class="max-w-md mx-auto border-2 dark:bg-stone-900 bg-white shadow-md  p-6">
+    <div class="search-form">
       <h2 class="text-2xl font-semibold mb-4 text-center dark:text-stone-300">Bestellung suchen</h2>
       <form @submit.prevent="submitForm" class="space-y-4">
         <div class="relative w-full">
@@ -34,7 +34,7 @@
         <div class="text-right">
           <button
             type="submit"
-            class="bg-orange-600 text-white px-4 py-2 rounded-full hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            class="btn-pims btn-orange"
           >
             Suchen
           </button>

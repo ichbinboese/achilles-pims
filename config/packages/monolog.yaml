@@ -1,5 +1,5 @@
 monolog:
-    channels: ['ldap']
+    channels: ['ldap','deprecation']
     handlers:
         main:
             type: stream

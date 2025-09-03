@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Main\Bestellungen;
+use App\Entity\Main\EasyProduct;
 use Symfony\Component\Ldap\Ldap;
+use App\Entity\Main\EasyOrder;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -14,13 +16,16 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use App\Repository\AuthTokenRepository;
+use App\Repository\EasyProductRepository;
 
 class IndexController extends AbstractController
 {
     private EntityManagerInterface $oracleManager;
 
-    public function __construct(ManagerRegistry $registry) {
+    public function __construct(ManagerRegistry $registry, EntityManagerInterface $entityManager) {
         $this->oracleManager = $registry->getManager('oracle');
+        $this->entityManager = $entityManager;
     }
 
     #[Route('/', name: 'home')]
@@ -85,8 +90,29 @@ class IndexController extends AbstractController
     }
 
     #[Route('/api/pims-bestellungen', name: 'pims_bestellungen_create', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, ValidatorInterface $validator): JsonResponse
+    public function create(
+        Request $request,
+        EntityManagerInterface $em,
+        ValidatorInterface $validator,
+        AuthTokenRepository $authTokenRepository
+    ): JsonResponse
     {
+        $authHeader = $request->headers->get('Authorization');
+        if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
+            return $this->json(['error' => 'Kein Auth-Token'], 401);
+        }
+        $token = substr($authHeader, 7);
+
+        // Token aus DB holen und prüfen
+        $authToken = $authTokenRepository->findOneBy(['token' => $token]);
+        if (!$authToken) {
+            return $this->json(['error' => 'Ungültiger Token'], 403);
+        }
+        if ($authToken->getExpiresAt() && $authToken->getExpiresAt() < new \DateTime()) {
+            return $this->json(['error' => 'Token abgelaufen'], 403);
+        }
+
+        // --- Rest deiner Logik ---
         $data = json_decode($request->getContent(), true);
 
         $bestellung = new Bestellungen();
@@ -96,7 +122,6 @@ class IndexController extends AbstractController
         $bestellung->setPimsbestellnummer($data['pimsbestellnummer'] ?? '');
         $bestellung->setAppfirma($data['appfirma'] ?? '');
 
-        // ✅ Validierung starten
         $errors = $validator->validate($bestellung);
 
         if (count($errors) > 0) {
@@ -107,12 +132,12 @@ class IndexController extends AbstractController
             return $this->json(['error' => 'Validierung fehlgeschlagen', 'details' => $messages], 400);
         }
 
-        // ✅ Speichern
         $em->persist($bestellung);
         $em->flush();
 
         return $this->json(['status' => 'created', 'id' => $bestellung->getId()]);
     }
+
 
 
     #[Route('/api/easy-search', name: 'api_easy_search', methods: ['GET'])]
@@ -137,6 +162,7 @@ class IndexController extends AbstractController
                       ON oo.oxid = ooa.oxorderid
                     WHERE oo.oxordernr LIKE :orderNr
                       AND ooa.oxstorno = 0
+                    ORDER BY ooa.ddposition
                 SQL;
 
         $stmt   = $conn->prepare($sql);
@@ -213,4 +239,73 @@ class IndexController extends AbstractController
         ]);
     }
 
+    #[Route('/api/orders', name: 'api_orders', methods: ['GET'])]
+    public function listOrders(EntityManagerInterface $em): JsonResponse
+    {
+        // Hole Orders + Produkte in einem Rutsch
+        $qb = $em->createQueryBuilder()
+            ->select('o', 'p')
+            ->from(EasyOrder::class, 'o')
+            ->leftJoin(EasyProduct::class, 'p', 'WITH', 'p.order = o');
+
+        // als Arrays (statt Entities) zurück
+        $result = $qb->getQuery()->getArrayResult();
+
+        // Ergebnis ist eine verschachtelte Struktur je nach Hydration.
+        // Wir mappen explizit auf ein schlankes, frontend-freundliches JSON:
+        $orders = [];
+
+        foreach ($result as $row) {
+            // $row enthält i. d. R. nur 'o' (Order) – je nach Hydrationsstrategie
+            // Wenn du bei getArrayResult beide Selekte brauchst, verwende stattdessen:
+            // $rows = $em->createQuery('SELECT o, p FROM ...')->getArrayResult();
+            // und mapiere dann sauber. Alternativ: eine zweite Query für Produkte je Order.
+
+            // Sicherheitshalber: lade die Order-Entity separat & Produkte dazu
+            // (einfach & zuverlässig – für kleine Datenmengen):
+        }
+
+        // Besser: direkt so:
+        $ordersRaw = $em->getRepository(EasyOrder::class)->createQueryBuilder('o')
+            ->leftJoin('o.products', 'p')
+            ->addSelect('p')
+            ->getQuery()
+            ->getResult(); // Entities
+
+        foreach ($ordersRaw as $orderEntity) {
+            $products = [];
+            foreach ($orderEntity->getProducts() ?? [] as $p) {
+                $products[] = [
+                    'productId'  => $p->getProductId(),
+                    'productNr'  => $p->getProductNr(),
+                    'oxOrderNr'  => $p->getOxOrderNr(),   // << das Feld aus EasyProduct
+                    'ddPosition' => $p->getDdPosition(),
+                ];
+            }
+
+            $orders[] = [
+                'orderid'  => $orderEntity->getOrderId(),
+                'ordernr'  => $orderEntity->getOrderNr(),
+                'status'   => $orderEntity->getStatus(),
+                'products' => $products,
+            ];
+        }
+
+        return new JsonResponse($orders, 200);
+    }
+
+    #[Route('/api/easy-product/exists', name: 'easy_product_exists', methods: ['GET'])]
+    public function exists(Request $req, EasyProductRepository $repo): JsonResponse
+    {
+        // Param-Namen exakt so wie im Frontend:
+        $ox = $req->query->get('oxordernr');     // z.B. "305AB2103152"
+        $pos = $req->query->getInt('ddposition'); // z.B. 2
+
+        if (!$ox || $pos === 0) {
+            return new JsonResponse(['exists' => false, 'error' => 'missing params'], 400);
+        }
+
+        $exists = $repo->existsByOxOrderNrAndDdPosition($ox, $pos);
+        return new JsonResponse(['exists' => $exists]);
+    }
 }

@@ -120,9 +120,11 @@ const submitOrder = async () => {
   try {
     const response = await axios.post('https://pims-api.stage.printdays.net/v1/pimsOrder.php', form, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
-      }
+        'Content-Type': 'multipart/form-data; boundary=---011000010111000001101001',
+        Accept: 'application/json, application/xml',
+        Authorization: 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
+      },
+      params: {key: '91aislr7f513g8qn0jdi5yige2mhtg6'},
     })
 
     if (response.data.success === 1) {

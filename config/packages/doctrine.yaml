@@ -6,7 +6,7 @@ doctrine:
                 # configure these for your database server
                 url: '%env(resolve:DATABASE_PIMS_URL)%'
                 driver: 'pdo_mysql'
-                server_version: '5.7'
+                server_version: '10.5.29-MariaDB-0+deb11u1'
                 charset: utf8mb4
             oracle:
                 # configure these for your database server
@@ -18,9 +18,11 @@ doctrine:
                 # configure these for your database server
                 url: '%env(resolve:DATABASE_EASY_URL)%'
                 driver: 'pdo_mysql'
-                server_version: '5.4'
+                server_version: '10.5.29-MariaDB-0+deb11u1'
                 charset: utf8mb4
     orm:
+        controller_resolver:
+            auto_mapping: false   # oder Block ganz entfernen
         default_entity_manager: default
         entity_managers:
             default:

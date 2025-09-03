@@ -14,6 +14,7 @@ import PimsProduct from "./components/PimsProduct.vue";
 import NotFound from "./components/NotFound.vue"
 import EasyForm from "./components/EasyForm.vue"
 import EasyResult from "./components/EasyResult.vue"
+import EasyOrderOverview from "./components/EasyOrderOverview.vue"
 
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
@@ -32,6 +33,7 @@ const routes = [
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
   { path: '/easy-result', name: 'easy-result',  component: EasyResult, meta: { requiresAuth: true }  },
   { path: '/easy-form', name: 'easy-form',  component: EasyForm, meta: { requiresAuth: true }  },
+  { path: '/easy-orders', name: 'easy-orders',  component: EasyOrderOverview, meta: { requiresAuth: true }  },
 ]
 
 const router = createRouter({

@@ -23,7 +23,7 @@ class PimsProdukt
 
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    private ?string $easysmapping = null;
+    private ?string $easymapping = null;
 
     public function __toString(): string
     {
@@ -68,14 +68,14 @@ class PimsProdukt
         return $this;
     }
 
-    public function getEasysmapping(): ?string
+    public function getEasymapping(): ?string
     {
-        return $this->easysmapping;
+        return $this->easymapping;
     }
 
-    public function setEasysmapping(?string $easysmapping): self
+    public function setEasymapping(?string $easymapping): self
     {
-        $this->easysmapping = $easysmapping;
+        $this->easymapping = $easymapping;
         return $this;
     }
 }

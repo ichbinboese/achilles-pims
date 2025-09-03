@@ -1,5 +1,5 @@
 <template>
-  <div class="container max-w-2xl mx-auto mt-10 px-4 bg-white dark:bg-stone-800">
+  <div class="main-container-mini">
     <h1 class="text-2xl font-bold py-6">PIMS Bestellungen Übersicht</h1>
 
     <!-- Suchfeld und Filter -->
@@ -12,7 +12,7 @@
       />
       <button
         @click="fetchBestellungen"
-        class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded"
+        class="btn-pims btn-orange"
       >
         Suchen
       </button>
@@ -69,14 +69,14 @@
         <button
           @click="prevPage"
           :disabled="page === 1"
-          class="px-3 py-1 rounded border bg-stone-200 hover:bg-stone-300 disabled:opacity-50 dark:bg-stone-700 dark:border-stone-600 dark:text-white"
+          class="btn-pims btn-stone"
         >
           Zurück
         </button>
         <button
           @click="nextPage"
           :disabled="page === totalPages"
-          class="px-3 py-1 rounded border bg-stone-200 hover:bg-stone-300 disabled:opacity-50 dark:bg-stone-700 dark:border-stone-600 dark:text-white"
+          class="btn-pims btn-stone"
         >
           Weiter
         </button>
