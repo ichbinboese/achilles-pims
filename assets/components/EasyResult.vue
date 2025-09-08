@@ -2,7 +2,7 @@
   <div class="container max-w-6xl mx-auto px-4 mt-4 bg-white dark:bg-stone-800 pb-4 mb-4 pt-4">
     <!-- Auswahlmodal -->
     <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 z-[1000] flex items-center justify-center">
-      <div class="bg-white dark:bg-stone-900 border border-orange-600 rounded shadow-lg w-full max-w-xl mx-auto">
+      <div class="bg-white dark:bg-stone-900 border border-orange-600 rounded shadow-lg max-w-2xl w-full mx-auto">
         <div class="px-6 py-4 border-b">
           <h2 class="text-lg font-semibold dark:text-stone-300">Position auswählen</h2>
         </div>
@@ -15,7 +15,7 @@
               @click="selectPosition(item)"
               class="cursor-pointer px-4 py-2 rounded-full border border-stone-300 hover:bg-orange-100 dark:hover:bg-orange-600 transition"
             >
-              Position {{ item.ddposition * 10 }} – {{ item.oxtitle }}
+              <strong>{{ item.oxordernr }}:</strong> Position {{ item.ddposition * 10 }} – {{ item.oxtitle }}
             </li>
           </ul>
           <div class="mt-6 flex items-center justify-end">
@@ -217,7 +217,7 @@
             </p>
             <input type="file" accept="application/pdf" class="hidden" ref="fileFrontInput" @change="handleFileChange($event, 'front')" />
             <button @click="triggerFile('front')" class="text-orange-600 font-medium underline">Datei auswählen</button>
-            <p v-if="fileFront" class="mt-2 text-sm text-lime-700 dark:text-line-200">{{ fileFront.name }} als Datei hochladen</p>
+            <p v-if="fileFront" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ fileFront.name }} als Datei hochladen</p>
           </div>
 
           <!-- Rückseite Upload -->
@@ -251,8 +251,10 @@
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import {useToast} from "vue-toastification";
 
 const route = useRoute()
+const toast = useToast()
 const orderNr = route.query.orderNr || ''
 const loading = ref(true)
 const submitting = ref(false)
@@ -309,6 +311,13 @@ const pagesModel = computed({
 
 onMounted(async () => {
   try {
+    const stored = sessionStorage.getItem('pendingToast')
+    if (stored) {
+      const { message, type } = JSON.parse(stored)
+      if (type === 'success') toast.success(message)
+      else if (type === 'error') toast.error(message)
+      sessionStorage.removeItem('pendingToast')
+    }
     const { data } = await axios.get('/api/easy-search', { params: { orderNr } })
     results.value = data.map(i => ({
       oxid: i.oxid,
@@ -419,6 +428,7 @@ async function selectPosition(item) {
   await applySizeFromOxartnum(item.oxartnum)
   // ebenfalls prüfen
   alreadyOrdered.value = await checkAlreadyOrdered(item.oxordernr, item.ddposition)
+  toast.success(`Auftrag ${item.oxordernr} - ${item.ddposition*10} geladen!`)
 }
 
 function cancelSelection() {
@@ -531,8 +541,8 @@ async function submitOrder(item) {
       form.append('width', String(productForm.width ?? 0))
       form.append('height', String(productForm.height ?? 0))
       form.append('pages', String(pagesModel.value)) // nur 1 oder 2
-      form.append('comment', `${item.oxordernr}-${item.ddposition * 10}`)
-      form.append('identifier', item.oxtitle ?? '')
+      form.append('comment', String(productForm.comment ?? '').trim())
+      form.append('identifier', `${item.oxordernr}-${item.ddposition * 10} - ${item.oxtitle}` ?? '')
       form.append('checkmail', 'info@easyordner.de')
       form.append('neutral', 'N')
       form.append('file_front', fileFront.value, fileFront.value.name)
@@ -568,8 +578,8 @@ function getNextWeekday(weekday) {
   return today
 }
 
-// Berechne den nächsten Dienstag (2) und Freitag (5)
-const nextTuesday = getNextWeekday(2)
+// Berechne den nächsten Mittwoch (3) und Freitag (5)
+const nextTuesday = getNextWeekday(3)
 const nextFriday = getNextWeekday(5)
 
 // Bestimme, welcher der beiden Tage näher ist
@@ -623,6 +633,7 @@ async function submitParcel(productRes, orderRes, item) {
     const { data } = await axios.request(options)
     console.log('Parcel Response:', data)
     submitOrderToBackend(orderRes, productRes, item)
+    reloadPageWithToast('Druckauftrag angelegt')
   } catch (error) {
     console.error('Fehler beim Absenden des Parcel:', error)
   }
@@ -708,6 +719,7 @@ async function stornoOrder(item) {
     lastOrderResponse.value = { ...(lastOrderResponse.value || {}), storno: data }
     if (data?.success === 1) {
       alreadyOrdered.value = false
+      reloadPageWithToast('Druckauftrag storniert')
     } else {
       const msgParts = [data?.error, data?.message, data?.reason, data?.raw, data?.status].filter(Boolean)
       error.value = msgParts.length ? msgParts.join(' | ') : 'Storno nicht erfolgreich.'
@@ -738,6 +750,11 @@ watch(selectedItem, async (val) => {
     alreadyOrdered.value = false
   }
 })
+function reloadPageWithToast(message, type = 'success') {
+  sessionStorage.setItem('pendingToast', JSON.stringify({ message, type }))
+  window.location.reload()
+}
+
 </script>
 
 <style scoped>

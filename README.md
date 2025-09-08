@@ -1,173 +1,141 @@
-# Achilles PIMS
+# Achilles PIMS Bestellsystem
 
-Ein modernes Symfony 6.4 + Vue 3 + Tailwind Projekt für Bestellverwaltung und Schnittstellen-Integration.
-
----
-
-## Inhaltsverzeichnis
-
-- [Features](#features)
-- [Systemvoraussetzungen](#systemvoraussetzungen)
-- [Installation](#installation)
-- [Konfiguration](#konfiguration)
-- [Frontend-Entwicklung (Vue + Tailwind)](#frontend-entwicklung-vue--tailwind)
-- [API & Authentifizierung](#api--authentifizierung)
-- [Eigene UI-Komponenten (Best Practice)](#eigene-ui-komponenten-best-practice)
-- [Tests](#tests)
-- [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
-- [Mitwirkende](#mitwirkende)
-- [Lizenz](#lizenz)
+Ein internes Bestellsystem für **Pinguin/Achilles**, entwickelt mit **Symfony 6.4**, **Vue 3** und **TailwindCSS**.  
+Es verbindet sich mit der **PIMS API** (Order- und Produkt-Schnittstellen) und stellt ein modernes Webfrontend zur Verfügung.
 
 ---
 
-## Features
+## 🚀 Features
 
-- **Symfony 6.4 Backend** mit REST-APIs (Bestellungen, Produkte, Authentifizierung)
-- **Vue 3 Frontend:** Moderne Komponentenstruktur, Routing, State-Management
-- **TailwindCSS** für einheitliches, responsives UI-Design
-- **API Authentifizierung** via Bearer-Token
-- **Wiederverwendbare UI-Komponenten** für Buttons, Cards, Links etc.
-- **Dark-Mode-Unterstützung**
-- **Datenbank:** Doctrine ORM (MySQL/PostgreSQL/SQLite)
-
----
-
-## Systemvoraussetzungen
-
-- PHP >= 8.3
-- Composer
-- Node.js >= 18, npm/yarn
-- Datenbank (MySQL, PostgreSQL oder SQLite)
-- Git
+- Benutzer-Login (LDAP)
+- Übersicht und Verwaltung von PIMS-Bestellungen
+- Bestellung von Druckprodukten (API-Anbindung an `pimsOrder.php`, `pimsProduct.php` & `pimsParcel.php`)
+- Statusabfrage für Aufträge und Produkte (`pimsOrderStatus.php`)
+- Dynamisches Frontend mit Vue.js & Tailwind
+- Docker-Setup für lokale Entwicklung
 
 ---
 
-## Installation
+## 🛠️ Tech-Stack
+
+- **Backend:** [Symfony 6.4](https://symfony.com/) (PHP 8.2)
+- **Frontend:** [Vue 3](https://vuejs.org/), [TailwindCSS](https://tailwindcss.com/)
+- **Build-Tools:** Webpack Encore
+- **Datenbank:** MariaDB / MySQL
+- **Container:** Docker & Docker Compose
+
+---
+
+## 📂 Projektstruktur
+
+```txt
+.
+├── assets/           # Vue 3 Komponenten, Tailwind CSS
+├── config/           # Symfony Konfiguration
+├── migrations/       # Doctrine Migrations
+├── public/           # Öffentliche Dateien, Entry-Point
+├── src/              # Symfony PHP Code
+├── templates/        # Twig Templates
+├── tests/            # PHPUnit Tests
+├── translations/     # Sprachdateien
+├── docker/           # Docker Build-Files
+├── compose.yaml      # Docker Compose Setup
+└── README.md
+```
+
+---
+
+## ⚙️ Installation
+
+### Voraussetzungen
+- Docker & Docker Compose
+- Node.js (>= 18) & npm oder Yarn
+- PHP 8.2 (falls lokal ohne Docker)
+
+### Setup
 
 ```bash
+# Repository klonen
 git clone https://github.com/ichbinboese/achilles-pims.git
 cd achilles-pims
 
 # Abhängigkeiten installieren
 composer install
-npm install
+yarn install   # oder npm install
 
-# .env anpassen (z.B. DB-Zugang, APP_API_TOKEN)
-cp .env .env.local
+# Tailwind Build starten
+yarn dev       # oder npm run dev
 
-# Datenbank anlegen & Migrationen ausführen
-php bin/console doctrine:database:create
-php bin/console doctrine:migrations:migrate
-
-# Assets/Vue/Tailwind bauen
-npm run dev   # für Entwicklung
-npm run build # für Produktion
-
-# Lokalen Webserver starten (z.B. symfony cli oder PHP built-in)
-symfony serve
-# oder
-php -S localhost:8000 -t public
+# Docker-Container starten
+docker compose up -d
 ```
-## Frontend-Entwicklung (Vue + Tailwind)
 
-Das Frontend liegt unter `/assets` und ist in folgende Bereiche strukturiert:
+---
 
-- `/assets/components/elements/` – für Buttons, Cards, AppLink, usw.
-- `/assets/components/pages/` – für Seiten-Views
-- `/assets/styles/` – globale Styles, eigene Tailwind-Klassen mit `@apply` (z.B. `.btn-orange`)
+## 🔑 Umgebungsvariablen
 
-### Entwicklung starten
+Alle Konfigurationen erfolgen über `.env`.  
+**Wichtig:** **niemals echte Zugangsdaten committen** – nutze `.env.local`.
+
+Beispiel `.env.example`:
+
+```env
+APP_ENV=dev
+APP_SECRET=ChangeMe
+
+# Datenbank
+DATABASE_URL="mysql://user:password@127.0.0.1:3306/achilles_pinguin"
+
+# PIMS API
+PIMS_API_URL="https://pims-api.stage.printdays.net/v1"
+PIMS_API_KEY="your-api-key"
+PIMS_API_AUTH="Basic xyz123"
+```
+
+---
+
+## ▶️ Entwicklung
 
 ```bash
-npm run dev
-```
-Öffne dann deinen Browser unter: http://localhost:8000
+# Lokale Symfony API starten
+symfony serve -d
 
-## Eigene Komponenten verwenden
-Beispiel für einen eigenen Button als Vue-Komponente:
+# Frontend Hot-Reload
+yarn dev
 
-```html
-<!-- assets/components/elements/Button.vue -->
-<template>
-  <button class="px-4 py-2 rounded-2xl shadow bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">
-    <slot />
-  </button>
-</template>
-```
-Mehr Beispiele findest du unter /assets/components/elements/.
-
-## API & Authentifizierung
-### Authentifizierung per Bearer-Token
-Alle schreibenden API-Requests benötigen einen gültigen Auth-Token im Header:
-```dotenv
-Authorization: Bearer DEIN_API_TOKEN
-```
-Neue Tokens kannst du per Symfony-Command, Admin-Endpoint oder direkt in der Datenbank erzeugen.
-
-Beispiel (fetch in JS):
-
-```js
-fetch('/api/pims-bestellungen', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer DEIN_API_TOKEN'
-  },
-  body: JSON.stringify(data)
-})
-```
-
-#### Beispiel: API-Endpunkt Bestellungen anlegen
-```php
-#[Route('/api/pims-bestellungen', name: 'pims_bestellungen_create', methods: ['POST'])]
-public function create(Request $request, EntityManagerInterface $em, ValidatorInterface $validator): JsonResponse
-{
-    // ... Auth-Token-Prüfung und Logik siehe src/Controller/...
-}
-```
-
-## Eigene UI-Komponenten (Best Practice)
-- Wiederverwendbare Komponenten (z.B. `<Button>`, `<AppLink>`, `<Card>`) liegen unter `/assets/components/elements/`
-- Styling wird zentral in diesen Komponenten gepflegt.
-- Erweiterbar mit Props (Farbe, Größe, etc.)
-- Siehe Beispiele im Code-Repository.
-
-## Tests
-- Backend: PHPUnit (tests/)
-- Frontend: Optionale Unit-Tests mit z.B. Vitest/Jest
-
-Beispiel Backend-Test:
-```bash
+# Tests ausführen
 php bin/phpunit
 ```
 
-## Deployment
+---
 
-Production Build:
+## 🧪 Tests & CI
 
-```bash
-npm run build
-php bin/console cache:clear --env=prod
-```
+- **PHPUnit** für Backend
+- **ESLint & Vue TSC** für Frontend
+- GitHub Actions (Beispiel: `.github/workflows/ci.yml`)
+    - Build & Lint
+    - Unit-Tests
+    - Security-Checks (PHPStan, ESLint)
 
-Empfohlen:
+---
 
-- .env.local mit Produktionsdaten ausstatten
-- Webserver auf /public zeigen lassen
-- HTTPS erzwingen
+## 🛡️ Sicherheit
 
-## Troubleshooting
+- `.env`, `.env.local` **nicht committen**
+- API-Keys ausschließlich über Secrets (GitHub Actions, Docker ENV)
+- Abhängigkeiten regelmäßig mit **Composer audit** & **npm audit** prüfen
+- Optional: GitHub Dependabot aktivieren
 
-- **Fehlende Abhängigkeiten:** <br>Prüfe, ob alle PHP- und JS-Abhängigkeiten installiert sind.
-- **Tailwind Klassen werden nicht angewendet:** <br>Prüfe, ob npm run dev/build ohne Fehler läuft.
+---
 
-- **API gibt 401 oder 403:** <br>Prüfe Auth-Token in .env.local und Request-Header.
+## 📜 Lizenz
 
-- **Probleme mit Datenbank:** <br>Prüfe Datenbankzugang und führe ggf. Migrationen erneut aus.
+Dieses Projekt steht unter der **MIT Lizenz**.  
+Siehe [LICENSE](./LICENSE) für Details.
 
-## Mitwirkende
-- Benjamin Böse
+---
 
-## Lizenz
-Dieses Projekt steht unter der MIT-Lizenz – siehe LICENSE.
+## 👥 Autoren
+
+- **Benjamin Böse** – Entwicklung

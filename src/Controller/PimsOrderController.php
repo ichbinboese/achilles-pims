@@ -3,9 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Main\PimsKaschierung;
-use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Mime\Part\DataPart;
@@ -18,9 +16,7 @@ use App\Entity\Main\PimsProdukt;
 use App\Entity\Main\PimsDruckfarben;
 use App\Entity\Main\EasyOrder;
 use App\Entity\Main\EasyProduct;
-use App\Repository\EasyProductRepository;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 
 class PimsOrderController extends AbstractController
 {
