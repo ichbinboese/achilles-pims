@@ -18,6 +18,7 @@ use App\Entity\Main\PimsProdukt;
 use App\Entity\Main\PimsDruckfarben;
 use App\Entity\Main\EasyOrder;
 use App\Entity\Main\EasyProduct;
+use App\Repository\EasyProductRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -447,4 +448,178 @@ class PimsOrderController extends AbstractController
         }
     }
 
+    #[Route('/api/proxy/pims-product-storno', name: 'api_pims_product_storno', methods: ['POST'])]
+    public function stornoProduct(Request $request, HttpClientInterface $http): JsonResponse
+    {
+        $payload = json_decode($request->getContent() ?: '{}', true) ?? [];
+        $productId = $payload['productid'] ?? null;
+        if (!$productId) {
+            return $this->json(['success' => 0, 'error' => 'productid erforderlich'], 400);
+        }
+
+        $base = rtrim($_ENV['PIMS_API_BASE'] ?? 'https://pims-api.stage.printdays.net/v1', '/');
+        $key  = $_ENV['PIMS_API_KEY']  ?? '';
+        $auth = $_ENV['PIMS_API_AUTH'] ?? '';
+
+        // Authorization-Header normalisieren
+        $authHeader = (static function (string $raw): string {
+            $raw = trim($raw);
+            if ($raw === '') return '';
+            if (stripos($raw, 'basic ') === 0) return $raw;                 // "Basic xxx"
+            if (str_contains($raw, ':')) return 'Basic '.base64_encode($raw); // "user:pass"
+            return 'Basic '.$raw;                                            // nur Base64
+        })($auth);
+
+        try {
+            // stornoProduct.php (laut deinem Wunsch)
+            $response = $http->request('POST', $base.'/stornoProduct.php', [
+                'query'        => ['output' => 'json', 'key' => $key],
+                'headers'      => [
+                    'Accept'        => 'application/json, application/xml',
+                    'Authorization' => $authHeader,
+                    'User-Agent'    => 'Achilles-Pinguin/1.0',
+                ],
+                'body'         => ['productid' => (string)$productId], // x-www-form-urlencoded
+                'http_version' => '1.1',
+                'timeout'      => 20,
+            ]);
+
+            $status = $response->getStatusCode();
+            $raw    = $response->getContent(false) ?? '';
+            $data   = json_decode($raw, true);
+
+            if ($data === null) {
+                $ct = $response->getHeaders(false)['content-type'][0] ?? '';
+                if (stripos($ct, 'xml') !== false || str_starts_with(ltrim($raw), '<')) {
+                    $xml = @simplexml_load_string($raw);
+                    if ($xml) $data = json_decode(json_encode($xml), true);
+                }
+            }
+
+            if (!$data || !is_array($data)) {
+                $data = ['success' => 0, 'error' => 'Unlesbare Antwort vom PIMS-Server', 'raw' => mb_substr($raw, 0, 1000)];
+            }
+
+            // Debug-Metadaten beilegen
+            $headers = $response->getHeaders(false);
+            $ct = $headers['content-type'][0] ?? '';
+            $data = $data + ['http_status' => $status, 'content_type' => $ct];
+
+            return $this->json($data, $status);
+        } catch (\Throwable $e) {
+            return $this->json(['success' => 0, 'error' => 'Transportfehler: '.$e->getMessage()], 502);
+        }
+    }
+
+    public function stornoProductBatch(Request $request, HttpClientInterface $http): JsonResponse
+    {
+        $payload = json_decode($request->getContent() ?: '{}', true) ?? [];
+        $ids = $payload['productids'] ?? $payload['productIds'] ?? null;
+        if (!is_array($ids) || empty($ids)) {
+            return $this->json(['success' => 0, 'error' => 'productids (Array) erforderlich'], 400);
+        }
+
+        $results = [];
+        foreach ($ids as $pid) {
+            $sub = $this->stornoProduct(new Request(content: json_encode(['productid' => $pid])), $http);
+            $results[] = json_decode($sub->getContent(), true);
+        }
+        return $this->json(['items' => $results], 200);
+    }
+
+    #[Route('/api/proxy/pims-storno', name: 'api_pims_storno', methods: ['POST'])]
+    public function stornoOrder(Request $request, HttpClientInterface $http): JsonResponse
+    {
+        $body = json_decode($request->getContent() ?: '{}', true) ?? [];
+        $orderId = $body['orderid'] ?? null;
+
+        if (!$orderId) {
+            return $this->json(['success' => 0, 'error' => 'orderid erforderlich'], 400);
+        }
+
+        $base = rtrim($_ENV['PIMS_API_BASE'] ?? 'https://pims-api.stage.printdays.net/v1', '/');
+        $key  = $_ENV['PIMS_API_KEY']  ?? '';
+        $auth = $_ENV['PIMS_API_AUTH'] ?? '';
+
+        // Hilfsfunktion: Authorization-Header normalisieren (user:pass | base64 | "Basic ...")
+        $authHeader = (static function (string $raw): string {
+            $raw = trim($raw);
+            if ($raw === '') return '';
+            if (stripos($raw, 'basic ') === 0) return $raw;          // schon fertig
+            if (str_contains($raw, ':')) return 'Basic '.base64_encode($raw); // user:pass
+            return 'Basic '.$raw;                                     // base64 ohne "Basic "
+        })($auth);
+
+        try {
+            // 1) POST (x-www-form-urlencoded), output/key in QUERY (wie bei dir bei Order/Product)
+            $response = $http->request('POST', $base.'/stornoOrder.php', [
+                'query'        => ['output' => 'json', 'key' => $key],
+                'headers'      => [
+                    'Accept'        => 'application/json, application/xml',
+                    'Authorization' => $authHeader,
+                    'User-Agent'    => 'Achilles-Pinguin/1.0',
+                    // KEIN Content-Type setzen => HttpClient macht urlencoded aus 'body'
+                ],
+                'body'         => [
+                    'orderid' => (string)$orderId,
+                ],
+                'http_version' => '1.1',
+                'timeout'      => 20,
+            ]);
+
+            $status = $response->getStatusCode();
+
+            // 403-Fallback: einige Backends verlangen GET für stornoOrder.php
+            if ($status === 403) {
+                $response = $http->request('GET', $base.'/stornoOrder.php', [
+                    'query'        => [
+                        'orderid' => (string)$orderId,
+                        'output'  => 'json',
+                        'key'     => $key,
+                    ],
+                    'headers'      => [
+                        'Accept'        => 'application/json, application/xml',
+                        'Authorization' => $authHeader,
+                        'User-Agent'    => 'Achilles-Pinguin/1.0',
+                    ],
+                    'http_version' => '1.1',
+                    'timeout'      => 20,
+                ]);
+                $status = $response->getStatusCode();
+            }
+
+            $raw  = $response->getContent(false) ?? '';
+            $data = json_decode($raw, true);
+
+            if ($data === null) {
+                $ct = $response->getHeaders(false)['content-type'][0] ?? '';
+                if (stripos($ct, 'xml') !== false || str_starts_with(ltrim($raw), '<')) {
+                    $xml = @simplexml_load_string($raw);
+                    if ($xml) $data = json_decode(json_encode($xml), true);
+                }
+            }
+
+            $headers = $response->getHeaders(false);
+            $ct = $headers['content-type'][0] ?? '';
+            $debug = [
+                'http_status' => $status,
+                'content_type'=> $ct,
+            ];
+
+            if (!$data || !is_array($data)) {
+                $data = [
+                        'success' => 0,
+                        'error'   => 'Leere oder unlesbare Antwort vom PIMS-Server',
+                        'raw'     => mb_substr($raw, 0, 1000),
+                    ] + $debug;
+            } else {
+                // nützliche Debug-Metadaten mitgeben
+                $data = $data + $debug;
+            }
+
+            return $this->json($data, $status);
+        } catch (\Throwable $e) {
+            return $this->json(['success' => 0, 'error' => 'Transportfehler: '.$e->getMessage()], 502);
+        }
+    }
 }

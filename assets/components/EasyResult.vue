@@ -25,6 +25,32 @@
       </div>
     </div>
 
+    <!-- Storno Modal -->
+    <div
+      v-if="showStornoConfirm"
+      class="fixed inset-0 bg-black bg-opacity-50 z-[2000] flex items-center justify-center"
+    >
+      <div class="bg-white dark:bg-stone-900 rounded-lg shadow-lg max-w-sm w-full p-6 text-center">
+        <h3 class="text-lg font-semibold mb-4 dark:text-stone-200">
+          Möchten Sie wirklich stornieren?
+        </h3>
+        <div class="flex justify-center gap-4">
+          <button
+            @click="confirmStorno"
+            class="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+          >
+            Ja, stornieren
+          </button>
+          <button
+            @click="showStornoConfirm = false"
+            class="px-4 py-2 rounded bg-stone-300 hover:bg-stone-400 dark:bg-stone-700 dark:hover:bg-stone-600 dark:text-white"
+          >
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Loader / Error -->
     <div v-if="loading" class="flex justify-center items-center h-full">
       <svg class="animate-spin h-8 w-8 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -90,16 +116,27 @@
                 Position ändern
               </button>
 
-              <!-- NEU: Umschalten je nach alreadyOrdered -->
+              <!-- Bereits bestellt (disabled) -->
               <button
                 v-if="selectedItem && alreadyOrdered"
                 disabled
-                class="px-3 py-2 rounded bg-lime-600 dark:bg-lime-500 text-white dark:text-white cursor-not-allowed"
+                class="px-3 py-2 rounded bg-lime-600 dark:bg-lime-500 text-white cursor-not-allowed"
                 title="Diese Position wurde bereits bestellt"
               >
                 bereits bestellt
               </button>
 
+              <!-- NEU: Auftrag stornieren -->
+              <button
+                v-if="selectedItem && alreadyOrdered"
+                :disabled="stornoSubmitting"
+                @click="openStornoConfirm(selectedItem)"
+                class="px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              >
+                {{ stornoSubmitting ? 'Storniert…' : 'Auftrag stornieren' }}
+              </button>
+
+              <!-- Standard: Bestellung absenden -->
               <button
                 v-else
                 :disabled="!selectedItem || submitting"
@@ -169,7 +206,7 @@
         <div class="space-y-6">
           <!-- Vorderseite Upload -->
           <div
-            class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
+            class="border-2 border-dashed p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
             :class="[frontDragOver || fileFront ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600']"
             @dragover.prevent="frontDragOver = true"
             @dragleave.prevent="frontDragOver = false"
@@ -185,7 +222,7 @@
 
           <!-- Rückseite Upload -->
           <div
-            class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
+            class="border-2 border-dashed p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
             :class="[backDragOver || fileBack ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600']"
             @dragover.prevent="backDragOver = true"
             @dragleave.prevent="backDragOver = false"
@@ -224,6 +261,7 @@ const results = ref([])
 const selectedItem = ref(null)
 const showModal = ref(false)
 const lastOrderResponse = ref(null)
+const stornoSubmitting = ref(false)
 
 const fileFront = ref(null)
 const fileBack = ref(null)
@@ -236,6 +274,8 @@ const mappingError = ref('')
 const widthTouched = ref(false)
 const heightTouched = ref(false)
 const alreadyOrdered = ref(false)
+const showStornoConfirm = ref(false)
+let stornoItem = null
 
 function markTouched(field) {
   if (field === 'w') widthTouched.value = true
@@ -348,7 +388,7 @@ async function fetchMappings(oxartnum) {
     mappedCodes.wvkaschieren = c.wvkaschieren ?? null
 
     if (!getCode(mappedCodes.product) && !getCode(mappedCodes.paper) && !getCode(mappedCodes.color) && !getCode(mappedCodes.wvkaschieren)) {
-      mappingError.value = 'Kein Mapping gefunden. Prüfe EASy-Mapping & SKU.'
+      mappingError.value = 'Kein Mapping gefunden. Prüfe EASY-Mapping & SKU.'
     } else {
       mappingError.value = ''
     }
@@ -603,6 +643,91 @@ async function submitOrderToBackend(orderRes, productRes, item) {
   } catch (error) {
     console.error('Fehler beim Speichern der Bestellung:', error)
   }
+}
+
+function isProductActive(prod) {
+  const s = (prod?.status ?? '').toString().toLowerCase()
+  const inactive = ['storniert','canceled','cancelled','deleted','abgeschlossen','completed','versendet','shipped']
+  return !inactive.some(x => s.includes(x))
+}
+
+async function getOrderStatus(orderid) {
+  const { data } = await axios.get('/api/proxy/pims-order-status', { params: { orderid } })
+  return data
+}
+
+async function cancelAllActiveProducts(orderid) {
+  const status = await getOrderStatus(orderid)
+  const products = Array.isArray(status?.products?.product) ? status.products.product : []
+  const active = products.filter(isProductActive)
+
+  for (const prod of active) {
+    const productid = prod.productid || prod.id
+    if (!productid) continue
+    try {
+      const { data } = await axios.post('/api/proxy/pims-product-storno', { productid })
+      console.log('Produkt-Storno', productid, data)
+    } catch (e) {
+      console.error('Produkt-Storno Fehler:', e)
+      // optional: throw e; // wenn du bei Fehlern abbrechen willst
+    }
+  }
+}
+
+async function stornoOrder(item) {
+  stornoSubmitting.value = true
+  error.value = null
+  try {
+    // orderid ermitteln
+    let orderid = lastOrderResponse.value?.order?.orderid
+    if (!orderid) {
+      if (!item?.oxordernr || !item?.ddposition) throw new Error('Weder orderid noch (oxordernr/ddposition) vorhanden.')
+      const { data: lookup } = await axios.get('/api/orders/orderid', { params: { oxordernr: item.oxordernr, ddposition: item.ddposition } })
+      if (lookup?.success === 1 && lookup?.orderid) orderid = lookup.orderid
+      else throw new Error(lookup?.error || 'orderid konnte nicht ermittelt werden.')
+    }
+
+    // 1) Alle aktiven Produkte stornieren
+    await cancelAllActiveProducts(orderid)
+
+    // 2) Prüfen, ob noch aktive Produkte da sind
+    {
+      const statusAfter = await getOrderStatus(orderid)
+      const productsAfter = Array.isArray(statusAfter?.products?.product) ? statusAfter.products.product : []
+      const stillActive = productsAfter.filter(isProductActive)
+      if (stillActive.length > 0) {
+        const list = stillActive.map(p => `${p.productnr ?? p.productid ?? 'Produkt'}: ${p.status}`).join(', ')
+        error.value = `Storno nicht möglich: Noch aktive Produkte vorhanden. Bitte erneut versuchen oder manuell prüfen. Aktive: ${list}`
+        return
+      }
+    }
+
+    // 3) Jetzt Order stornieren
+    const { data } = await axios.post('/api/proxy/pims-storno', { orderid })
+    console.log('STORNO RAW:', data)
+    lastOrderResponse.value = { ...(lastOrderResponse.value || {}), storno: data }
+    if (data?.success === 1) {
+      alreadyOrdered.value = false
+    } else {
+      const msgParts = [data?.error, data?.message, data?.reason, data?.raw, data?.status].filter(Boolean)
+      error.value = msgParts.length ? msgParts.join(' | ') : 'Storno nicht erfolgreich.'
+    }
+  } catch (e) {
+    error.value = e?.response?.data?.error || e.message || 'Fehler beim Storno.'
+  } finally {
+    stornoSubmitting.value = false
+  }
+}
+function openStornoConfirm(item) {
+  stornoItem = item
+  showStornoConfirm.value = true
+}
+
+async function confirmStorno() {
+  if (!stornoItem) return
+  showStornoConfirm.value = false
+  await stornoOrder(stornoItem) // deine bestehende Funktion
+  stornoItem = null
 }
 
 // Wenn sich die Auswahl ändert: erneut prüfen

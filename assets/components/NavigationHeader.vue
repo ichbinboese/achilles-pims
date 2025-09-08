@@ -1,5 +1,5 @@
 <template>
-  <nav class="bg-gradient-to-r from-amber-50 to-amber-60 dark:to-stone-950 px-4 py-3 flex items-center justify-between flex-wrap border-b-2 border-orange-600 text-stone-800">
+  <nav class="bg-gradient-to-r from-amber-50 to-amber-60 dark:to-stone-950 px-4 py-3 flex items-center justify-between flex-wrap border-b-2 border-orange-600 text-stone-800 gap-y-6">
     <!-- Logo -->
     <router-link to="/" class="text-xl font-semibold flex items-center space-x-4">
       <span><img src="https://www.achilles.de/wp-content/uploads/ACH_Logo_Wortbildmarke_CMYK.png" alt="achilles-logo" class="max-h-10" /></span>
@@ -43,7 +43,7 @@
             to="/easy-orders"
             class="nav-link-items"
           >
-            Bestellungliste easyOrdner.de
+            Bestellliste easyOrdner.de
           </router-link>
         </li>
         <li v-if="user.username === 'bboese' || user.username === 'biagri'">

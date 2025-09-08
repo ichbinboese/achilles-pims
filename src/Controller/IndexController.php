@@ -18,12 +18,15 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use App\Repository\AuthTokenRepository;
 use App\Repository\EasyProductRepository;
+use Doctrine\DBAL\Connection;
 
 class IndexController extends AbstractController
 {
     private EntityManagerInterface $oracleManager;
+    private EntityManagerInterface $entityManager;
 
-    public function __construct(ManagerRegistry $registry, EntityManagerInterface $entityManager) {
+    public function __construct(ManagerRegistry $registry, EntityManagerInterface $entityManager)
+    {
         $this->oracleManager = $registry->getManager('oracle');
         $this->entityManager = $entityManager;
     }
@@ -91,10 +94,10 @@ class IndexController extends AbstractController
 
     #[Route('/api/pims-bestellungen', name: 'pims_bestellungen_create', methods: ['POST'])]
     public function create(
-        Request $request,
+        Request                $request,
         EntityManagerInterface $em,
-        ValidatorInterface $validator,
-        AuthTokenRepository $authTokenRepository
+        ValidatorInterface     $validator,
+        AuthTokenRepository    $authTokenRepository
     ): JsonResponse
     {
         $authHeader = $request->headers->get('Authorization');
@@ -117,7 +120,7 @@ class IndexController extends AbstractController
 
         $bestellung = new Bestellungen();
         $bestellung->setAppbestellnummer($data['appbestellnummer'] ?? '');
-        $bestellung->setAppbestellposition((int) ($data['appbestellposition'] ?? 0));
+        $bestellung->setAppbestellposition((int)($data['appbestellposition'] ?? 0));
         $bestellung->setPimsid($data['pimsid'] ?? '');
         $bestellung->setPimsbestellnummer($data['pimsbestellnummer'] ?? '');
         $bestellung->setAppfirma($data['appfirma'] ?? '');
@@ -139,16 +142,15 @@ class IndexController extends AbstractController
     }
 
 
-
     #[Route('/api/easy-search', name: 'api_easy_search', methods: ['GET'])]
     public function easySearch(Request $request, ManagerRegistry $doctrine): JsonResponse
     {
-        $em     = $doctrine->getManager('easy');
-        $conn   = $em->getConnection();
+        $em = $doctrine->getManager('easy');
+        $conn = $em->getConnection();
         $orderNr = $request->query->get('orderNr', '');
 
         //  → exakt matchen:
-        $sql =  <<<SQL
+        $sql = <<<SQL
                     SELECT
                         ooa.oxid,
                         oo.oxordernr,
@@ -165,7 +167,7 @@ class IndexController extends AbstractController
                     ORDER BY ooa.ddposition
                 SQL;
 
-        $stmt   = $conn->prepare($sql);
+        $stmt = $conn->prepare($sql);
         $result = $stmt->executeQuery([
             'orderNr' => '%' . $orderNr,
         ]);
@@ -276,17 +278,17 @@ class IndexController extends AbstractController
             $products = [];
             foreach ($orderEntity->getProducts() ?? [] as $p) {
                 $products[] = [
-                    'productId'  => $p->getProductId(),
-                    'productNr'  => $p->getProductNr(),
-                    'oxOrderNr'  => $p->getOxOrderNr(),   // << das Feld aus EasyProduct
+                    'productId' => $p->getProductId(),
+                    'productNr' => $p->getProductNr(),
+                    'oxOrderNr' => $p->getOxOrderNr(),   // << das Feld aus EasyProduct
                     'ddPosition' => $p->getDdPosition(),
                 ];
             }
 
             $orders[] = [
-                'orderid'  => $orderEntity->getOrderId(),
-                'ordernr'  => $orderEntity->getOrderNr(),
-                'status'   => $orderEntity->getStatus(),
+                'orderid' => $orderEntity->getOrderId(),
+                'ordernr' => $orderEntity->getOrderNr(),
+                'status' => $orderEntity->getStatus(),
                 'products' => $products,
             ];
         }
@@ -307,5 +309,29 @@ class IndexController extends AbstractController
 
         $exists = $repo->existsByOxOrderNrAndDdPosition($ox, $pos);
         return new JsonResponse(['exists' => $exists]);
+    }
+
+    #[Route('/api/orders/orderid', name: 'api_orders_orderid', methods: ['GET'])]
+    public function findOrderId(
+        Request               $request,
+        EasyProductRepository $easyProductRepo
+    ): JsonResponse
+    {
+        $oxordernr = $request->query->get('oxordernr');
+        $ddposition = $request->query->getInt('ddposition', 0);
+
+        if (!$oxordernr || !$ddposition) {
+            return $this->json(['success' => 0, 'error' => 'oxordernr und ddposition erforderlich'], 400);
+        }
+
+        // 1) Über Entity/Repository suchen
+        $orderId = $easyProductRepo->existsByOxOrderNrAndDdPosition($oxordernr, $ddposition);
+
+
+        if ($orderId) {
+            return $this->json(['success' => 1, 'orderid' => $orderId]);
+        }
+
+        return $this->json(['success' => 0, 'error' => 'orderid nicht gefunden'], 404);
     }
 }
