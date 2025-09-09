@@ -25,6 +25,12 @@ class APPOrder
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: APPProduct::class)]
     private $products;
 
+    #[ORM\Column(type: "string", nullable: true)]
+    private ?string $appbestnr;
+
+    #[ORM\Column(type: "string", nullable: true)]
+    private ?string $appposnr;
+
     // Getter und Setter
 
     public function getId(): ?int
@@ -75,4 +81,28 @@ class APPOrder
         $this->products = $products;
         return $this;
     }
+
+    public function getAppbestnr(): ?string
+    {
+        return $this->appbestnr;
+    }
+
+    public function setAppbestnr(?string $appbestnr): self
+    {
+        $this->appbestnr = $appbestnr;
+        return $this;
+    }
+
+    public function getAppposnr(): ?string
+    {
+        return $this->appposnr;
+    }
+
+    public function setAppposnr(?string $appposnr): self
+    {
+        $this->appposnr = $appposnr;
+        return $this;
+    }
+
+
 }

@@ -8,8 +8,10 @@ api_login_check:
     path: /api/login
     methods: [POST]
 
+# ⬇️ SPA nur für GET und alles außer /api …
 spa_catch_all:
     path: /{vueRouting}
     controller: App\Controller\SpaController::index
     requirements:
-        vueRouting: .+
+        vueRouting: (?!api($|/)).*   # <- /api ausschließen
+    methods: [GET]                 # <- nur GET erlauben

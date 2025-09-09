@@ -24,7 +24,7 @@
       <ul v-if="user" class="lg:flex lg:space-x-2 mt-4 lg:space-y-0 space-y-4 lg:mt-0">
         <li v-if="user.username !== 'biagrie'">
           <router-link
-            to="/bestellungen"
+            to="/app-orders"
             class="nav-link-items"
           >
             Bestellliste b7 - APP
@@ -95,7 +95,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores/auth.js'
 import axios from "axios";
 
 // Reaktive Variablen

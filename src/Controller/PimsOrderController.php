@@ -15,7 +15,9 @@ use App\Entity\Main\PimsPapier;
 use App\Entity\Main\PimsProdukt;
 use App\Entity\Main\PimsDruckfarben;
 use App\Entity\Main\EasyOrder;
+use App\Entity\Main\APPOrder;
 use App\Entity\Main\EasyProduct;
+use App\Entity\Main\APPProduct;
 use Psr\Log\LoggerInterface;
 
 class PimsOrderController extends AbstractController
@@ -617,5 +619,64 @@ class PimsOrderController extends AbstractController
         } catch (\Throwable $e) {
             return $this->json(['success' => 0, 'error' => 'Transportfehler: '.$e->getMessage()], 502);
         }
+    }
+
+    #[Route('/api/app-order', name: 'api_app_order', methods: ['POST'])]
+    public function createapporder(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $appbestnr = $data['appbestnr'] ?? null;
+        $appposnr  = $data['appposnr'] ?? null;
+        $orderId   = $data['orderId']  ?? null;
+        $orderNr   = $data['orderNr']  ?? null;
+
+        if (!$appbestnr || !$appposnr) {
+            return new JsonResponse(['error' => 'APP Bestellnummer und Position fehlt.'], 400);
+        }
+
+        $order = new APPOrder();
+        $order->setAppbestnr((string)$appbestnr);
+        $order->setAppposnr((string)$appposnr);
+        if ($orderId) $order->setOrderId((string)$orderId);
+        if ($orderNr) $order->setOrderNr((string)$orderNr);
+
+        $em->persist($order);
+        $em->flush();
+
+        return new JsonResponse(['id' => $order->getId()], 201);
+    }
+
+    #[Route('/api/app-product', name: 'api_app_product', methods: ['POST'])]
+    public function createappproduct(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $orderId   = $data['orderId']   ?? null;   // PIMS orderid
+        $orderNr   = $data['orderNr']   ?? null;   // PIMS ordernr
+        $productId = $data['productId'] ?? null;   // PIMS productid
+        $productNr = $data['productNr'] ?? null;   // PIMS productnr
+
+        if (!$productId && !$productNr) {
+            return new JsonResponse(['error' => 'Missing productId or productNr'], 400);
+        }
+
+        // passende APPOrder suchen (z. B. über orderId oder orderNr)
+        $order = null;
+        if ($orderId) {
+            $order = $em->getRepository(APPOrder::class)->findOneBy(['orderId' => (string)$orderId]);
+        }
+        if (!$order && $orderNr) {
+            $order = $em->getRepository(APPOrder::class)->findOneBy(['orderNr' => (string)$orderNr]);
+        }
+
+        $prod = new APPProduct();
+        if ($productId) $prod->setProductId((string)$productId);
+        if ($productNr) $prod->setProductNr((string)$productNr);
+        if ($order)     $prod->setOrder($order);
+
+        $em->persist($prod);
+        $em->flush();
+
+        return new JsonResponse(['id' => $prod->getId()], 201);
     }
 }

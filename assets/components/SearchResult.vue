@@ -1,36 +1,13 @@
 <template>
-  <div class="container max-w-2xl mx-auto mt-10 px-4 bg-white">
-    <div v-if="loading" class="text-stone-600">Lade Daten...</div>
-
-    <div v-else-if="error" class="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4">
-      {{ error }}
-    </div>
-
-    <!-- Modal zur Bestätigung -->
-    <div v-if="showConfirm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div class="bg-white dark:bg-stone-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h2 class="text-lg font-semibold mb-4 dark:text-stone-200">
-          Möchten Sie die Bestellung bei Pinguin-Druck aufgeben?
-        </h2>
-        <div class="flex justify-end space-x-4">
-          <button @click="showConfirm = false" class="px-4 py-2 bg-stone-300 dark:bg-stone-700 rounded">
-            Abbrechen
-          </button>
-          <button @click="submitOrder" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded">
-            Ja, absenden
-          </button>
-        </div>
-      </div>
-    </div>
-
+  <div class="container max-w-6xl mx-auto px-4 mt-4 bg-white dark:bg-stone-800 pb-4 mb-4 pt-4">
     <!-- Auswahlmodal -->
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center">
-      <div class="bg-white dark:bg-stone-900 border border-orange-600 rounded shadow-lg w-full max-w-md mx-auto">
+    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 z-[1000] flex items-center justify-center">
+      <div class="bg-white dark:bg-stone-900 border border-orange-600 rounded shadow-lg max-w-2xl w-full mx-auto">
         <div class="px-6 py-4 border-b">
           <h2 class="text-lg font-semibold dark:text-stone-300">Position auswählen</h2>
         </div>
         <div class="px-6 py-4 dark:text-stone-300">
-          <p class="mb-4">Welche Position möchten Sie verwenden?</p>
+          <p class="mb-4">Bitte wählen Sie eine Position aus.</p>
           <ul class="space-y-2">
             <li
               v-for="item in results"
@@ -38,56 +15,95 @@
               @click="selectPosition(item)"
               class="cursor-pointer px-4 py-2 rounded-full border border-stone-300 hover:bg-orange-100 dark:hover:bg-orange-600 transition"
             >
-              Position {{ item.bestpos }}
+              Bestellung <strong>{{ item.bestnr }}</strong> – Position <strong>{{ item.bestpos }}</strong>
             </li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- Anzeige der gewählten Bestellung -->
-    <div v-if="selected" class="mt-8 bg-white dark:bg-stone-800 p-5">
-      <h3 class="text-xl font-semibold mb-4 dark:text-stone-300">
-        Details zur Position {{ selected.bestpos }} von {{ selected.bestnr }}:
-      </h3>
-      <table class="table-auto border border-stone-300 bg-white dark:bg-stone-900 overflow-hidden text-sm dark:text-stone-300">
-        <tbody>
-        <tr class="border-b">
-          <th class="text-left p-2 w-1/5">Firma:</th>
-          <td class="p-2">{{ selected.fiNr }}</td>
-        </tr>
-        <tr class="border-b">
-          <th class="text-left p-2">Bestellnummer:</th>
-          <td class="p-2">{{ selected.bestnr }}</td>
-        </tr>
-        <tr>
-          <th class="text-left p-2">Bestelltext:</th>
-          <td class="p-2 whitespace-pre-line">{{ selected.txtlong ?? '-' }}</td>
-        </tr>
-        </tbody>
-      </table>
+    <!-- Lade-/Fehlerzustände -->
+    <div v-if="loading" class="text-stone-600">Lade Daten…</div>
+    <div v-else-if="error" class="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4">
+      { '{' } error { '}' }
     </div>
 
-    <!-- Absende-Button -->
-    <button
-      v-if="selected"
-      @click="showConfirm = true"
-      class="my-6 inline-block bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full"
-    >
-      Bestellung erfassen
-    </button>
+    <!-- Anzeige der gewählten Bestellung -->
+    <div v-else-if="selected" class="mt-6 space-y-6">
+      <!-- Kopf mit Wechsel-Button -->
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-semibold dark:text-stone-300">
+          Details zur Position {{ selected.bestpos }} von <strong>{{ selected.bestnr }}</strong>
+        </h3>
+        <button @click="showModal = true" class="px-4 py-2 rounded-full border border-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700">
+          Position wechseln
+        </button>
+      </div>
+
+      <!-- Kerndaten -->
+      <div class="p-4 rounded-lg border dark:border-stone-700 bg-white dark:bg-stone-900">
+        <table class="table-auto w-full text-sm dark:text-stone-300">
+          <tbody>
+          <tr class="border-b">
+            <th class="text-left p-2 align-top w-1/4">Firma:</th>
+            <td class="p-2">{{ selected.fiNr }}</td>
+          </tr>
+          <tr class="border-b">
+            <th class="text-left p-2 align-top">Bestellnummer:</th>
+            <td class="p-2">{{ selected.bestnr }}</td>
+          </tr>
+          <tr class="border-b">
+            <th class="text-left p-2 align-top">Position:</th>
+            <td class="p-2">{{ selected.bestpos }}</td>
+          </tr>
+          <tr class="border-b">
+            <th class="text-left p-2 align-top">Beschreibung:</th>
+            <td class="p-2 whitespace-pre-line">{{ selected.txtlong }}</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Absende-Button -->
+      <div class="flex items-center gap-3">
+        <button
+          @click="showConfirm = true"
+          class="inline-flex items-center bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full"
+        >
+          Bestellung erfassen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bestätigungsmodal -->
+  <div v-if="showConfirm" class="fixed inset-0 bg-black bg-opacity-50 z-[1100] flex items-center justify-center">
+    <div class="bg-white dark:bg-stone-800 rounded-lg shadow-lg p-6 w-full max-w-md border border-orange-600">
+      <h2 class="text-lg font-semibold mb-4 dark:text-stone-200">
+        Möchten Sie die Bestellung bei Pinguin-Druck aufgeben?
+      </h2>
+      <div class="flex justify-end space-x-4">
+        <button @click="showConfirm = false" class="px-4 py-2 bg-stone-300 dark:bg-stone-700 rounded">
+          Abbrechen
+        </button>
+        <button @click="submitOrder" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded">
+          Ja, absenden
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import md5 from 'crypto-js/md5'
 import { useToast } from 'vue-toastification'
+import { useAuthStore } from '../stores/auth.js'
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 
 const results = ref([])
@@ -97,48 +113,61 @@ const showConfirm = ref(false)
 const loading = ref(true)
 const error = ref(null)
 
-const selectPosition = (item) => {
+function selectPosition(item) {
   selected.value = item
   showModal.value = false
 }
 
-const submitOrder = async () => {
+async function submitOrder() {
+  if (!selected.value) return
   const uniqueId = md5(`${selected.value.bestnr}-${selected.value.bestpos}`).toString()
 
   const form = new FormData()
   form.append('uniqueid', uniqueId)
-  form.append('title', 'firma') // oder 'herr', 'frau' je nach Auswahl
+  form.append('title', 'firma')
   form.append('name', 'Achilles Präsentationsprodukte GmbH')
   form.append('street', 'Bruchkampweg 40')
   form.append('postcode', '29227')
   form.append('locale', 'Celle')
   form.append('country', 'deutschland')
-  form.append('mail', 'me@somewhere.org')
+  form.append('mail', 'rechnungseingang@achilles.de')
   form.append('vat', 0.19)
   form.append('payment', 'rechnung')
 
   try {
-    const response = await axios.post('https://pims-api.stage.printdays.net/v1/pimsOrder.php', form, {
-      headers: {
-        'Content-Type': 'multipart/form-data; boundary=---011000010111000001101001',
-        Accept: 'application/json, application/xml',
-        Authorization: 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
-      },
-      params: {key: '91aislr7f513g8qn0jdi5yige2mhtg6'},
+
+    const orderRes = await axios.post('/api/proxy/pims-order', form);
+
+    console.log(orderRes.data)
+
+    if (orderRes.data?.success !== 1) {
+      toast.error('Bestellung konnte nicht erstellt werden.')
+      return
+    }
+
+    const { orderid, ordernr } = orderRes.data
+
+    // 2) APPOrder in deiner DB anlegen (Entity Main\APPOrder)
+    //    -> appbestnr, appposnr + orderId/ orderNr setzen
+    await axios.post('/api/app-order', {
+      appbestnr: selected.value.bestnr,
+      appposnr: selected.value.bestpos,
+      orderId: String(orderid),
+      orderNr: String(ordernr),
     })
 
-    if (response.data.success === 1) {
-            toast.success(`Bestellung erfolgreich erstellt: ${response.data.ordernr}`)
-            router.push({
-              name: 'PimsOrder',
-              params: {
-                bestnr:   selected.value.bestnr,
-                position: selected.value.bestpos
-              }
-            })
-    } else {
-      toast.error('Bestellung konnte nicht erstellt werden.')
-    }
+    toast.success(`Bestellung erfolgreich erstellt: ${ordernr}`)
+
+    // 3) Weiterleitung zur PimsProduct-Route
+    router.push({
+      name: 'product',                   // vorhandene Route
+      params: {
+        bestnr: selected.value.bestnr,
+        position: selected.value.bestpos,
+        orderid: String(orderid),
+        ordernr: String(ordernr),
+      }
+    })
   } catch (e) {
     console.error(e)
     toast.error('Fehler beim Absenden der Bestellung.')
@@ -147,18 +176,19 @@ const submitOrder = async () => {
   }
 }
 
+
 onMounted(async () => {
   try {
     const { fiNr, bestnr } = route.query
     const response = await axios.get('/api/bestellung', { params: { fiNr, bestnr } })
     const auth = useAuthStore()
 
-    // User laden
     if (!auth.user) {
       await auth.fetchUser()
     }
 
     results.value = response.data
+    console.log(results.value)
 
     if (results.value.length === 1) {
       selectPosition(results.value[0])
@@ -176,7 +206,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-input:focus {
+input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: #fb923c;
 }

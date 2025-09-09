@@ -3,9 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Main\Bestellungen;
-use App\Entity\Main\EasyProduct;
-use Symfony\Component\Ldap\Ldap;
 use App\Entity\Main\EasyOrder;
+use App\Entity\Main\EasyProduct;
+use App\Entity\Main\APPOrder;
+
+use Symfony\Component\Ldap\Ldap;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -18,7 +20,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use App\Repository\AuthTokenRepository;
 use App\Repository\EasyProductRepository;
-use Doctrine\DBAL\Connection;
 
 class IndexController extends AbstractController
 {
@@ -242,7 +243,7 @@ class IndexController extends AbstractController
     }
 
     #[Route('/api/orders', name: 'api_orders', methods: ['GET'])]
-    public function listOrders(EntityManagerInterface $em): JsonResponse
+    public function listEasyOrders(EntityManagerInterface $em): JsonResponse
     {
         // Hole Orders + Produkte in einem Rutsch
         $qb = $em->createQueryBuilder()
@@ -251,21 +252,9 @@ class IndexController extends AbstractController
             ->leftJoin(EasyProduct::class, 'p', 'WITH', 'p.order = o');
 
         // als Arrays (statt Entities) zurück
-        $result = $qb->getQuery()->getArrayResult();
-
         // Ergebnis ist eine verschachtelte Struktur je nach Hydration.
         // Wir mappen explizit auf ein schlankes, frontend-freundliches JSON:
         $orders = [];
-
-        foreach ($result as $row) {
-            // $row enthält i. d. R. nur 'o' (Order) – je nach Hydrationsstrategie
-            // Wenn du bei getArrayResult beide Selekte brauchst, verwende stattdessen:
-            // $rows = $em->createQuery('SELECT o, p FROM ...')->getArrayResult();
-            // und mapiere dann sauber. Alternativ: eine zweite Query für Produkte je Order.
-
-            // Sicherheitshalber: lade die Order-Entity separat & Produkte dazu
-            // (einfach & zuverlässig – für kleine Datenmengen):
-        }
 
         // Besser: direkt so:
         $ordersRaw = $em->getRepository(EasyOrder::class)->createQueryBuilder('o')
@@ -333,5 +322,54 @@ class IndexController extends AbstractController
         }
 
         return $this->json(['success' => 0, 'error' => 'orderid nicht gefunden'], 404);
+    }
+
+    /**
+    * Behandelt HTTP-GET-Anfragen, um eine Liste von Anwendungsbestellungen zusammen
+    * mit den zugehörigen Produkten abzurufen.
+    * Die Methode holt Bestellungen als Entitäten und bildet sie in eine verschachtelte
+    * JSON-Struktur ab. Jede Bestellung enthält relevante Metadaten sowie die zugehörigen
+    * Produkte.
+    * @param EntityManagerInterface $em Der Doctrine-Entity-Manager, der für die
+    * Datenbankinteraktion verwendet wird.
+    * @return JsonResponse Gibt eine JSON-Antwort zurück, die ein Array von Bestellungen enthält,
+    * wobei jede ihre Metadaten und zugehörigen Produkte hat.
+     */
+    #[Route('/api/app-orders', name: 'api_app_orders', methods: ['GET'])]
+    public function listAppOrders(EntityManagerInterface $em): JsonResponse
+    {
+        // Hole Orders + Produkte in einem Rutsch
+        // als Arrays (statt Entities) zurück
+        // Ergebnis ist eine verschachtelte Struktur je nach Hydration.
+        // Wir mappen explizit auf ein schlankes, frontend-freundliches JSON:
+        $orders = [];
+
+        // Besser: direkt so:
+        $ordersRaw = $em->getRepository(APPOrder::class)->createQueryBuilder('o')
+            ->leftJoin('o.products', 'p')
+            ->addSelect('p')
+            ->getQuery()
+            ->getResult(); // Entities
+
+        foreach ($ordersRaw as $orderEntity) {
+            $products = [];
+            foreach ($orderEntity->getProducts() ?? [] as $p) {
+                $products[] = [
+                    'productId' => $p->getProductId(),
+                    'productNr' => $p->getProductNr(),
+                    'oxOrderNr' => $p->getAppBestNr(),   // << das Feld aus EasyProduct
+                    'ddPosition' => $p->getBestPosition(),
+                ];
+            }
+
+            $orders[] = [
+                'orderid' => $orderEntity->getOrderId(),
+                'ordernr' => $orderEntity->getOrderNr(),
+                'status' => $orderEntity->getStatus(),
+                'products' => $products,
+            ];
+        }
+
+        return new JsonResponse($orders, 200);
     }
 }

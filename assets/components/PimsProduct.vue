@@ -71,7 +71,6 @@
         <input
           type="checkbox"
           v-model="form.wvstanzen"
-          value="stanzen_werkzeugvorhanden"
           class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
         />
         <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -83,7 +82,6 @@
         <input
           type="checkbox"
           v-model="form.wvuvlack"
-          value="uvlack_part_1"
           class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
         />
         <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -95,7 +93,6 @@
         <input
           type="checkbox"
           v-model="form.wvpraegenheiss"
-          value="praegenheiss_gold_werkzeugvorhanden_10"
           class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
         />
         <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -107,7 +104,6 @@
         <input
           type="checkbox"
           v-model="form.wvpraegenblind"
-          value="praegenblind_werkzeugvorhanden"
           class="form-checkbox h-5 w-5  accent-orange-500 hover:accent-orange-300 rounded"
         />
         <label class="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -181,25 +177,29 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 
+const route = useRoute()
 const toast = useToast()
 
 const form = ref({
   product: '',
+  checkmail: '',
   paper: '',
   color: '',
-  wvkaschierung: '',
+  wvkaschierung: '',  // ← UI-Auswahl; an API geht 'wvkaschieren'
   quantity: '',
   width: '',
   height: '',
-  wvstanzen: '',
-  wvuvlack: '',
+  // alle Optionen als Boolean flags:
+  wvstanzen: false,
+  wvuvlack: false,
+  wvpraegenheiss: false,
+  wvpraegenblind: false,
   comment: '',
   fileFront: null,
   fileBack: null,
-  wvpraegenheiss: '',
-  wvpraegenblind: '',
 })
 
 const produkte = ref([])
@@ -222,6 +222,10 @@ const emit = defineEmits(['update:fileFront', 'update:fileBack'])
 
 onMounted(async () => {
   try {
+    const { data } = await axios.get('/api/me', { withCredentials: true })
+    if (data?.authenticated) {
+      form.value.checkmail = data.email
+    }
     const [prod, pap, farb, kasch] = await Promise.all([
       axios.get('/api/pims-produkt'),
       axios.get('/api/pims-papier'),
@@ -237,35 +241,120 @@ onMounted(async () => {
   }
 })
 
-const submitProduct = async () => {
+async function submitProduct() {
   try {
-    const payload = new FormData()
-    payload.append('product', form.value.product)
-    payload.append('paper', form.value.paper)
-    payload.append('color', form.value.color)
-    payload.append('wvkaschierung', form.value.kaschierung)
-    payload.append('width', form.value.width)
-    payload.append('quantity', form.value.quantity)
-    payload.append('height', form.value.height)
-    payload.append('wvstanzen', form.value.wvstanzen)
-    payload.append('wvuvlack', form.value.wvuvlack)
-    payload.append('comment', form.value.comment)
-    payload.append('wvpraegenheiss', form.value.wvpraegenheiss)
-    payload.append('wvpraegenblind', form.value.wvpraegenblind)
-    if (fileFront.value) payload.append('file_front', fileFront.value)
-    if (fileBack.value) payload.append('file_back', fileBack.value)
+    const state = form.value;
+    const payload = new FormData();
 
-    const response = await axios.post('/api/proxy/pims-product', payload)
+    // Werte aus der Route
+    payload.append('orderid', String(route.params.orderid));
+    payload.append('checkmail', form.value.checkmail)
+    payload.append('uniqueid', `${route.params.bestnr}-${route.params.position}`);
 
-    if (response.data.success) {
-      toast.success(`Produkt erfolgreich angelegt: ${response.data.orderid}`)
+    // Werte aus dem Formular
+    payload.append('product',  state.product);
+    payload.append('duration', '3')
+    payload.append('paper',    state.paper);
+    payload.append('color',    state.color);
+    if (state.wvkaschierung) payload.append('wvkaschieren', state.wvkaschierung);
+    payload.append('readytoprint', 'A');
+    payload.append('quantity', String(state.quantity));
+    payload.append('width',    String(state.width));
+    payload.append('height',   String(state.height));
+    payload.append('neutral', 'N')
+    // falls du keine Seitenzahl im UI hast, lass "pages" ganz weg oder setze fix 1:
+    if (fileBack.value) {
+      payload.append('pages', '2')
     } else {
-      toast.error('Fehler bei der Produkterstellung:' + response.data.message)
+      payload.append('pages', '1')
     }
-  } catch (error) {
-    toast.error('Fehler beim Senden der Daten:' + error.message )
+    if (state.comment) payload.append('comment', state.comment);
+
+    if (fileFront.value) payload.append('file_front', fileFront.value, fileFront.value.name);
+    if (fileBack.value)  payload.append('file_back',  fileBack.value,  fileBack.value.name);
+
+    const productRes = await axios.post('/api/proxy/pims-product', payload, {
+      withCredentials: true,
+    });
+
+    console.log(productRes.data);
+
+    if (productRes.data?.success !== 1) {
+      console.error('PIMS Product Fehler:', productRes.data);
+      toast.error('Produkt anlegen fehlgeschlagen');
+      return;
+    }
+
+    // APPProduct persistieren
+    await axios.post('/api/app-product', {
+      orderId:   String(route.params.orderid),
+      orderNr:   String(route.params.ordernr),
+      productId: String(productRes.data.productid ?? ''),
+      productNr: String(productRes.data.productnr ?? ''),
+    });
+
+    toast.success(`Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`);
+  } catch (e) {
+    console.error(e);
+    toast.error('Fehler beim Anlegen des Produkts');
   }
 }
+
+
+async function submitParcel() {
+  try {
+    const form = new FormData()
+    form.append('orderid', String(route.params.orderid))
+    form.append('delivery', formState.delivery || 'dhl')
+    form.append('shipper_additional1', 'easyOrdner')
+    form.append('shipper_additional2', 'info@easyordner.de')
+    form.append('title', formState.title || 'firma')
+    form.append('name', formState.name || 'Achilles Präsentationsprodukte GmbH')
+    form.append('street', formState.street || 'Bruchkampweg 40')
+    form.append('postcode', formState.postcode || '29227')
+    form.append('locale', formState.locale || 'Celle')
+    form.append('country', formState.country || 'deutschland')
+    form.append('mail', formState.mail || 'info@easyordner.de')
+    if (formState.phone) form.append('phone', formState.phone)
+    if (formState.date)  form.append('date',  String(formState.date))
+
+    const parcelRes = await axios.post(
+      'https://pims-api.stage.printdays.net/v1/pimsParcel.php',
+      form,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data; boundary=---011000010111000001101001',
+          Accept: 'application/json, application/xml',
+          Authorization: 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
+        },
+        params: { key: '91aislr7f513g8qn0jdi5yige2mhtg6' },
+      }
+    )
+
+    if (parcelRes.data?.success !== 1) {
+      toast.error('Versand konnte nicht angelegt werden.')
+      console.error(parcelRes.data)
+      return
+    }
+    toast.success('Versanddaten angelegt.')
+  } catch (e) {
+    console.error(e)
+    toast.error('Fehler beim Anlegen der Versanddaten.')
+  }
+}
+
+
+async function loadActiveUserMail() {
+  const { data } = await axios.get('/api/me', { withCredentials: true })
+  if (data?.authenticated) {
+    // Beispiel: an ein Formularfeld binden
+    // form.value.mail = data.email
+    console.log('Aktiver User:', data.username, 'Mail:', data.email)
+    return data.email
+  }
+  return null
+}
+
 
 function triggerFile(type) {
   if (type === 'front') fileFrontInput.value?.click()

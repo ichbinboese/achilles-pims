@@ -536,7 +536,7 @@ async function submitOrder(item) {
       form.append('readytoprint', 'A')
       form.append('paper', paperCode)
       form.append('color', colorCode)
-      form.append('duration', '3')
+      form.append('duration', 3)
       form.append('quantity', String(Number((item.oxamount * 1.1) + 25)))
       form.append('width', String(productForm.width ?? 0))
       form.append('height', String(productForm.height ?? 0))

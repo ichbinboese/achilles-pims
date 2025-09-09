@@ -34,7 +34,7 @@
           Starten Sie direkt mit der Suche <br>nach einer Bestellung.
         </p>
         <router-link
-          to="/bestellungen"
+          to="/app-orders"
           class="btn-orange btn-pims"
         >
           Zur Bestellübersicht
@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
