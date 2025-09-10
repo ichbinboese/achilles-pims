@@ -177,13 +177,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
-import router from '@/router'
-
 
 const route = useRoute()
 const toast = useToast()
+const router = useRouter()
 
 const form = ref({
   product: '',
