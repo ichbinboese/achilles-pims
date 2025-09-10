@@ -8,7 +8,7 @@
             v-model="fiNr"
             class="appearance-none w-full px-4 py-2 pr-10 bg-white border-2 border-stone-300 rounded-full shadow-sm dark:bg-stone-700 focus:outline-none focus:ring-1 focus:ring-orange-600 focus:border-orange-600 dark:text-stone-300"
           >
-            <option disabled value="">-- bitte wählen --</option>
+            <option disabled value="">-- bitte Firma wählen --</option>
             <option value="114">APP</option>
             <option value="104">MPP</option>
             <option value="414">KMC</option>

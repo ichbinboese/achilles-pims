@@ -3,13 +3,15 @@
     <!-- Toolbar: Suche + Zähler -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
       <div class="flex items-center gap-2">
-        <label for="searchOx" class="text-sm dark:text-stone-200">Suche nach APP-Bestellnummer:</label>
+        <label for="searchOx" class="text-sm dark:text-stone-200">
+          Suche in AB-Nr., APP-Bestellnr., Pinguin-Nr. oder Produkt-Nr.:
+        </label>
         <input
           id="searchOx"
           v-model.trim="search"
           type="text"
-          placeholder="z. B. 12345"
-          class="w-56 p-2 border rounded-full dark:bg-stone-700 dark:text-white"
+          placeholder="z. B. BS2530 PR82017771 305AB…"
+          class="w-72 p-2 border rounded-full dark:bg-stone-700 dark:text-white"
         />
       </div>
       <div class="text-sm text-stone-600 dark:text-stone-300">
@@ -21,6 +23,7 @@
       <table class="table w-full">
         <thead>
         <tr>
+          <th>APP AB-Nummer</th>
           <th>APP-Bestellnummer</th>
           <th>Position</th>
           <th>Pinguin Auftragsnummer</th>
@@ -31,6 +34,7 @@
         </thead>
         <tbody>
         <tr v-for="order in paged" :key="order.orderId">
+          <td>{{ order.aufnr }}</td>
           <td>{{ order.oxordernr }}</td>
           <td>{{ order.ddposition }}</td>
           <td>{{ order.orderNr }}</td>
@@ -39,7 +43,7 @@
           <td>{{ order.productStatus || 'Unbekannt' }}</td>
         </tr>
         <tr v-if="paged.length === 0">
-          <td colspan="6" class="text-center py-6 text-stone-500">Keine Einträge gefunden.</td>
+          <td colspan="6" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-800">Keine Einträge gefunden.</td>
         </tr>
         </tbody>
       </table>
@@ -87,85 +91,143 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { useToast } from "vue-toastification";
 import axios from 'axios';
+const route = useRoute()
+const toast = useToast()
 
 const ordersWithStatus = ref([]);
 
 // --- Suche + Pagination State ---
 const search = ref('');
 const currentPage = ref(1);
-const pageSize = 20; // max. 20 Datensätze pro Seite
+const pageSize = 20;
 
-// Suche resetten -> immer auf Seite 1 springen
-watch(search, () => {
-  currentPage.value = 1;
-});
+watch(search, () => { currentPage.value = 1; });
 
-// Gefilterte Liste (nur nach oxordernr)
 const filtered = computed(() => {
-  const q = (search.value || '').toLowerCase();
+  const q = (search.value || '').toLowerCase().trim();
   if (!q) return ordersWithStatus.value;
-  return ordersWithStatus.value.filter(o =>
-    String(o.oxordernr ?? '').toLowerCase().includes(q)
-  );
+
+  // Mehrwortsuche: "2530 PR820" -> beide Tokens müssen matchen
+  const tokens = q.split(/\s+/).filter(Boolean);
+
+  return ordersWithStatus.value.filter(o => {
+    // alle relevanten Felder zu Strings machen
+    const fields = [
+      o.aufnr,
+      o.oxordernr,
+      o.orderNr,
+      o.productNr,
+    ]
+      .map(v => String(v ?? '').toLowerCase().trim())
+      .filter(Boolean); // leere raus
+
+    // Jeder Token muss in mind. einem Feld vorkommen
+    return tokens.every(t => fields.some(f => f.includes(t)));
+  });
 });
 
-// Seitenzahlen
 const totalPages = computed(() => Math.ceil(filtered.value.length / pageSize));
-
-// Aktuelle Seite zuschneiden
 const paged = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return filtered.value.slice(start, start + pageSize);
 });
 
-// Pagination Controls
 const goPrev = () => { if (currentPage.value > 1) currentPage.value--; };
 const goNext = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
 const goTo = (p) => { if (p >= 1 && p <= totalPages.value) currentPage.value = p; };
 
-// Kompakte Seitennavigation (1 … n)
 const pageButtons = computed(() => {
   const buttons = [];
   const tp = totalPages.value || 1;
   const cp = currentPage.value;
-
   const add = (label, page, opts = {}) => buttons.push({ key: `${label}-${page ?? 'x'}`, label, page, ...opts });
 
-  // Wenige Seiten -> alle anzeigen
-  if (tp <= 7) {
-    for (let i = 1; i <= tp; i++) add(i, i);
-    return buttons;
-  }
-
-  // Mehr Seiten -> komprimiert
+  if (tp <= 7) { for (let i = 1; i <= tp; i++) add(i, i); return buttons; }
   add(1, 1);
   if (cp > 3) add('…', null, { ellipsis: true, disabled: true });
-
   const start = Math.max(2, cp - 1);
   const end = Math.min(tp - 1, cp + 1);
   for (let i = start; i <= end; i++) add(i, i);
-
   if (cp < tp - 2) add('…', null, { ellipsis: true, disabled: true });
   add(tp, tp);
-
   return buttons;
 });
 
+// ===== helper: aufnr-Index bauen =====
+const FI_NR = 114;
+
+async function buildAufnrIndex(fiNr, normalizedList) {
+  const uniqueBestnrs = Array.from(
+    new Set(
+      normalizedList
+        .map(o => String(o.oxordernr || '').trim())
+        .filter(v => v && v !== '—')
+    )
+  );
+
+  const index = new Map(); // key: `${bestnr}|${bestpos}` -> aufnr
+
+  await Promise.all(
+    uniqueBestnrs.map(async (bestnr) => {
+      try {
+        const { data } = await axios.get('/api/bestellung', {
+          params: { fiNr, bestnr }
+        });
+        // data: [{ fiNr, bestnr, bestpos, txtlong, aufnr }]
+        (data || []).forEach(row => {
+          const key = `${String(row.bestnr).trim()}|${String(row.bestpos).trim()}`;
+          index.set(key, row.aufnr ?? null);
+        });
+      } catch (e) {
+        console.error('Fehler beim Laden /api/bestellung für', { fiNr, bestnr }, e);
+      }
+    })
+  );
+
+  return index;
+}
+
 onMounted(async () => {
+
+  if (route.query.toastMessage) {
+    toast[route.query.toastType || 'success'](route.query.toastMessage)
+  }
+
   try {
+    // 1) Grunddaten laden
     const { data } = await axios.get('/api/app-orders');
 
-    // Normalisieren inkl. oxordernr
-    const normalized = data.map(o => ({
+    // 2) Normalisieren + Basisfelder (inkl. oxordernr/bestnr + ddposition/bestpos)
+    const normalizedBase = data.map(o => ({
       orderId: String(o.orderid ?? '').trim(),
       orderNr: String(o.ordernr ?? '').trim(),
-      oxordernr: o.products?.[0]?.oxOrderNr ?? '—',
-      ddposition: o.products?.[0]?.ddPosition ?? '—',
+      appbestnr: String(o.appbestnr ?? '').trim(),
+      appposnr: String(o.appposnr ?? '').trim(),
+      oxordernr: String(o.appbestnr ?? '').trim(),   // BESTNR
+      ddposition: String(o.appposnr ?? '').trim(), // BESTPOS
     }));
 
-    const ids = normalized.map(o => o.orderId);
+    // 3) aufnr-Index aufbauen (ein Request pro unique BESTNR)
+    const aufnrIndex = await buildAufnrIndex(FI_NR, normalizedBase);
 
+    // 4) normalized um 'aufnr' erweitern
+    const normalized = normalizedBase.map(o => {
+      const bestnr = String(o.appbestnr || '').trim();
+      const bestpos = String(o.appposnr || '').trim();
+      const key = `${bestnr}|${bestpos}`;
+      const aufnr = bestnr && bestpos ? (aufnrIndex.get(key) ?? '—') : '—';
+
+      return {
+        ...o,
+        aufnr, // <-- HIER ist die gewünschte AUFNR drin
+      };
+    });
+
+    // 5) Status-Batch laden wie gehabt
+    const ids = normalized.map(o => o.orderId);
     const { data: batch } = await axios.post(
       '/api/proxy/pims-order-status/batch',
       { orderids: ids },
@@ -174,11 +236,13 @@ onMounted(async () => {
 
     const byId = Object.fromEntries(normalized.map(o => [o.orderId, o]));
 
+    // 6) Finales Merge – 'aufnr' bleibt erhalten
     ordersWithStatus.value = (batch.items || []).map(item => ({
       orderId: item.orderId,
       orderNr: byId[item.orderId]?.orderNr || item.orderNr || '—',
       oxordernr: byId[item.orderId]?.oxordernr || '—',
       ddposition: byId[item.orderId]?.ddposition || '—',
+      aufnr: byId[item.orderId]?.aufnr || '—', // <- verfügbar (falls du's später anzeigen willst)
       productNr: item.productNr || 'Unbekannt',
       status: item.status || 'Unbekannt',
       productStatus: item.productStatus || 'Unbekannt',
@@ -192,8 +256,7 @@ onMounted(async () => {
 });
 </script>
 
+
 <style scoped>
-tbody tr:nth-child(odd) {
-  background-color: #f3f4f6; /* Tailwind: bg-gray-100 */
-}
+
 </style>

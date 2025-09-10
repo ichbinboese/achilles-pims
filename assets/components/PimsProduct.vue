@@ -179,6 +179,8 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
+import router from '@/router'
+
 
 const route = useRoute()
 const toast = useToast()
@@ -200,6 +202,9 @@ const form = ref({
   comment: '',
   fileFront: null,
   fileBack: null,
+  fname: '',
+  lname: '',
+  phone: '',
 })
 
 const produkte = ref([])
@@ -220,12 +225,49 @@ const fileBackInput = ref(null)
 
 const emit = defineEmits(['update:fileFront', 'update:fileBack'])
 
+const lastProductId = ref(null)
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const parcelState = ref({
+  delivery: 'dhl',
+  title: 'firma',
+  name: 'Achilles Präsentationsprodukte GmbH',
+  street: 'Bruchkampweg 40',
+  postcode: '29227',
+  locale: 'Celle',
+  country: 'Deutschland',
+  phone: '',
+  date: '', // optional: ISO-String oder leer
+  shipper_additional1: 'Druckbogeneingang',
+  shipper_additional2: '', // setzen wir beim Laden des Users
+  mail: '' // wird aus /api/ldap-user befüllt
+})
+
+
 onMounted(async () => {
   try {
-    const { data } = await axios.get('/api/me', { withCredentials: true })
+    const { data } = await axios.get('/api/ldap-user', { withCredentials: true })
+
+    console.log(data)
+    console.log('Aktiver User:', data.firstname, '', data.lastname, ', E-Mail: ', data.email, ', Telefon:' , data.phone)
+
     if (data?.authenticated) {
-      form.value.checkmail = data.email
+      const userMail = data.email
+      form.value.checkmail = userMail
+      // optional: wenn du Vor-/Nachname wirklich brauchst:
+      form.value.phone = data.phone ?? ''
+      form.value.fname = data.firstname ?? data.fname ?? ''
+      form.value.lname = data.lastname  ?? data.lname  ?? ''
+
+      // für Parcel:
+      parcelState.value.mail = userMail
+      parcelState.value.shipper_additional2 = userMail
+
+      const fullName = [form.value.fname, form.value.lname].filter(Boolean).join(' ').trim()
+      if (fullName) parcelState.value.shipper_additional1 = fullName
     }
+
     const [prod, pap, farb, kasch] = await Promise.all([
       axios.get('/api/pims-produkt'),
       axios.get('/api/pims-papier'),
@@ -241,108 +283,210 @@ onMounted(async () => {
   }
 })
 
+async function ensureUserMail() {
+  // 1) Falls bereits gesetzt & valide → ok
+  if (parcelState.value.mail && emailRegex.test(parcelState.value.mail)) return parcelState.value.mail;
+
+  // 2) Erst aus /api/ldap-user versuchen
+  try {
+    const { data } = await axios.get('/api/ldap-user', { withCredentials: true });
+    const mail = data?.email?.trim();
+    if (mail && emailRegex.test(mail)) {
+      parcelState.value.mail = mail;
+      form.value.checkmail = mail; // für product
+      return mail;
+    }
+  } catch (_) {}
+
+  // 3) Fallback: /api/me
+  try {
+    const { data } = await axios.get('/api/me', { withCredentials: true });
+    const mail = data?.email?.trim();
+    if (mail && emailRegex.test(mail)) {
+      parcelState.value.mail = mail;
+      form.value.checkmail = mail;
+      return mail;
+    }
+  } catch (_) {}
+
+  // 4) Fehler
+  throw new Error('Keine gültige E-Mail ermittelbar');
+}
+
+// FIX: Produkt anlegen und productId an submitParcel übergeben
 async function submitProduct() {
   try {
-    const state = form.value;
-    const payload = new FormData();
+    const mail = await ensureUserMail();
+
+    const state = form.value
+    const payload = new FormData()
 
     // Werte aus der Route
-    payload.append('orderid', String(route.params.orderid));
-    payload.append('checkmail', form.value.checkmail)
-    payload.append('uniqueid', `${route.params.bestnr}-${route.params.position}`);
+    payload.append('orderid', String(route.params.orderid))
+    payload.append('checkmail', String(mail))
+    payload.append('uniqueid', `${route.params.bestnr}-${route.params.position}`)
 
     // Werte aus dem Formular
-    payload.append('product',  state.product);
+    payload.append('product',  state.product)
     payload.append('duration', '3')
-    payload.append('paper',    state.paper);
-    payload.append('color',    state.color);
-    if (state.wvkaschierung) payload.append('wvkaschieren', state.wvkaschierung);
-    payload.append('readytoprint', 'A');
-    payload.append('quantity', String(state.quantity));
-    payload.append('width',    String(state.width));
-    payload.append('height',   String(state.height));
+    payload.append('paper',    state.paper)
+    payload.append('color',    state.color)
+    if (state.wvkaschierung) payload.append('wvkaschieren', state.wvkaschierung)
+    payload.append('readytoprint', 'A')
+    payload.append('quantity', String(state.quantity))
+    payload.append('width',    String(state.width))
+    payload.append('height',   String(state.height))
     payload.append('neutral', 'N')
-    // falls du keine Seitenzahl im UI hast, lass "pages" ganz weg oder setze fix 1:
-    if (fileBack.value) {
-      payload.append('pages', '2')
-    } else {
-      payload.append('pages', '1')
-    }
-    if (state.comment) payload.append('comment', state.comment);
 
-    if (fileFront.value) payload.append('file_front', fileFront.value, fileFront.value.name);
-    if (fileBack.value)  payload.append('file_back',  fileBack.value,  fileBack.value.name);
+    // Seitenzahl aus Uploads ableiten
+    payload.append('pages', fileBack.value ? '2' : '1')
 
-    const productRes = await axios.post('/api/proxy/pims-product', payload, {
-      withCredentials: true,
-    });
+    if (state.comment) payload.append('comment', state.comment)
 
-    console.log(productRes.data);
+    if (fileFront.value) payload.append('file_front', fileFront.value, fileFront.value.name)
+    if (fileBack.value)  payload.append('file_back',  fileBack.value,  fileBack.value.name)
+
+    const productRes = await axios.post('/api/proxy/pims-product', payload, { withCredentials: true })
+    console.log('Product Response:', productRes.data)
 
     if (productRes.data?.success !== 1) {
-      console.error('PIMS Product Fehler:', productRes.data);
-      toast.error('Produkt anlegen fehlgeschlagen');
-      return;
-    }
-
-    // APPProduct persistieren
-    await axios.post('/api/app-product', {
-      orderId:   String(route.params.orderid),
-      orderNr:   String(route.params.ordernr),
-      productId: String(productRes.data.productid ?? ''),
-      productNr: String(productRes.data.productnr ?? ''),
-    });
-
-    toast.success(`Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`);
-  } catch (e) {
-    console.error(e);
-    toast.error('Fehler beim Anlegen des Produkts');
-  }
-}
-
-
-async function submitParcel() {
-  try {
-    const form = new FormData()
-    form.append('orderid', String(route.params.orderid))
-    form.append('delivery', formState.delivery || 'dhl')
-    form.append('shipper_additional1', 'easyOrdner')
-    form.append('shipper_additional2', 'info@easyordner.de')
-    form.append('title', formState.title || 'firma')
-    form.append('name', formState.name || 'Achilles Präsentationsprodukte GmbH')
-    form.append('street', formState.street || 'Bruchkampweg 40')
-    form.append('postcode', formState.postcode || '29227')
-    form.append('locale', formState.locale || 'Celle')
-    form.append('country', formState.country || 'deutschland')
-    form.append('mail', formState.mail || 'info@easyordner.de')
-    if (formState.phone) form.append('phone', formState.phone)
-    if (formState.date)  form.append('date',  String(formState.date))
-
-    const parcelRes = await axios.post(
-      'https://pims-api.stage.printdays.net/v1/pimsParcel.php',
-      form,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data; boundary=---011000010111000001101001',
-          Accept: 'application/json, application/xml',
-          Authorization: 'Basic QmVuamFtaW4uQm9lc2U6LHhLUTFOei4lRFpZTTc/Qw=='
-        },
-        params: { key: '91aislr7f513g8qn0jdi5yige2mhtg6' },
-      }
-    )
-
-    if (parcelRes.data?.success !== 1) {
-      toast.error('Versand konnte nicht angelegt werden.')
-      console.error(parcelRes.data)
+      console.error('PIMS Product Fehler:', productRes.data)
+      toast.error('Produkt anlegen fehlgeschlagen')
       return
     }
-    toast.success('Versanddaten angelegt.')
+
+    const productId = String(productRes.data.productid ?? productRes.data.productId ?? '')
+    lastProductId.value = productId
+
+    // WICHTIG: productId an Parcel übergeben
+    await submitParcel(productId, mail)
+
+    toast.success(`Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`)
+    navigateWithToast('app-orders', {}, {}, `Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`, 'success')
   } catch (e) {
     console.error(e)
-    toast.error('Fehler beim Anlegen der Versanddaten.')
+    toast.error('Fehler beim Anlegen des Produkts')
   }
 }
 
+
+function getNextWeekday(weekday) {
+  const today = new Date()
+  const dayOfWeek = today.getDay() // So=0, Mo=1, Di=2, Mi=3, Do=4, Fr=5, Sa=6
+  const diff = (weekday - dayOfWeek + 7) % 7
+  today.setDate(today.getDate() + diff)
+  return today
+}
+
+// Nächster Mittwoch (3) und Freitag (5)
+const nextWednesday = getNextWeekday(3)
+const nextFriday = getNextWeekday(5)
+
+// Der nähere der beiden Tage
+let nextDay = nextWednesday
+if (nextFriday - nextWednesday < 3 * 24 * 60 * 60 * 1000) {
+  nextDay = nextFriday
+}
+
+// "YYYY-MM-DD"
+const year = nextDay.getFullYear()
+const month = String(nextDay.getMonth() + 1).padStart(2, '0')
+const day = String(nextDay.getDate()).padStart(2, '0')
+const formattedNextDay = `${year}-${month}-${day}`
+console.log('formattedNextDay', formattedNextDay)
+
+
+// FIX: Signatur anpassen + fehlerhafte fd.append Aufrufe korrigieren
+async function submitParcel(productId, mail) {
+  try {
+    const p = parcelState.value
+    const fd = new FormData()
+
+    console.log('Parcel State:', p)
+    console.log('Mail (arg):', mail, 'valid:', emailRegex.test((mail || '').trim()))
+
+    // Pflicht: productid vom Produkt-Endpunkt
+    fd.append('productid', String(productId))
+
+    // Versanddaten
+    fd.append('delivery', p.delivery || 'dhl')
+    fd.append('title', p.title || 'firma')
+    fd.append('name', p.name || 'Achilles Präsentationsprodukte GmbH')
+    fd.append('street', p.street || 'Bruchkampweg 40')
+    fd.append('postcode', p.postcode || '29227')
+    fd.append('locale', p.locale || 'Celle')
+    fd.append('country', p.country || 'Deutschland')
+
+    // Kontakt – NUR wenn valide, und beides senden (mail + checkmail)
+    const safeMail = (mail || '').trim()
+    if (!emailRegex.test(safeMail)) {
+        toast.error(`Parcel: Ungültige E-Mail (${safeMail || 'leer'})`)
+        return
+    }
+
+    console.log('shipper_additional1 →', parcelState.value.shipper_additional1)
+
+    fd.append('mail', safeMail)
+    fd.append('checkmail', safeMail)
+    const phone = (form.value.phone ?? p.phone ?? '').trim()
+    if (phone) fd.append('phone', phone)
+
+    // Zusatzinfos (sauber zusammensetzen)
+    const additional1 =
+      (parcelState.value.shipper_additional1 || '').trim()
+      || [form.value.fname, form.value.lname].filter(Boolean).join(' ').trim()
+      || 'Druckbogeneingang'
+
+    fd.append('shipper_additional1', additional1)
+    fd.append('shipper_additional2', `${route.params.bestnr}-${route.params.position}`)
+
+    // Datum (Format vorher berechnet)
+    fd.append('date', formattedNextDay)
+
+    console.log('shipper_additional1 (final) →', additional1)
+
+    const { data } = await axios.post('/api/proxy/pims-parcel', fd, {
+      headers: { 'Content-Type': 'multipart/form-data', Accept: 'application/json' },
+      withCredentials: true
+    })
+
+    // Debug: Alle FormData-Keys anzeigen
+    for (const [k, v] of fd.entries()) {
+      if (k !== 'file_front' && k !== 'file_back') console.log('FD', k, '→', v)
+    }
+
+    console.log('Parcel Response:', data)
+
+    if (data?.success !== 1) {
+      console.error('Parcel Error:', data);
+      // Falls Backend weiterhin "mail" bemängelt → Wert ausgeben
+      toast.error(data?.errorlist?.error?.[0]?.text === 'ObligatoryFieldNotFilledOrWrongFormat'
+        ? `Parcel: E-Mail ungültig oder leer (${safeMail || 'leer'})`
+        : 'Paket/Versand anlegen fehlgeschlagen');
+      return;
+    }
+  } catch (error) {
+    console.error('Fehler beim Absenden des Parcel:', error);
+    toast.error('Fehler beim Absenden des Parcel');
+  }
+}
+
+function reloadPageWithToast(message, type = 'success') {
+  sessionStorage.setItem('pendingToast', JSON.stringify({ message, type }))
+  window.location.reload()
+}
+
+
+function navigateWithToast(name, params, query, msg, type = 'success') {
+  const p = params ?? {}
+  const q = { ...(query ?? {}), toastMessage: msg, toastType: type }
+  try {
+    return router.push({ name, params: p, query: q })
+  } catch (e) {
+    const href = router.resolve({ name, params: p, query: q }).href
+    window.location.assign(href)
+  }
+}
 
 async function loadActiveUserMail() {
   const { data } = await axios.get('/api/me', { withCredentials: true })

@@ -53,28 +53,35 @@ class IndexController extends AbstractController
         $conn = $this->oracleManager->getConnection();
 
         $sql = <<<SQL
-        SELECT *
-        FROM E110 a
-        LEFT JOIN B4000 b 
-            ON b.FI_NR = a.FI_NR 
-           AND b.TXT_NR = a.TXT_NR 
-           AND b.TXT_ART = 'TQP'
-        WHERE a.FI_NR = :fiNr AND a.BESTNR = :bestnr
-        ORDER BY a.BESTPOS
-    SQL;
+SELECT
+  a.FI_NR    AS A_FI_NR,
+  a.BESTNR   AS A_BESTNR,
+  a.BESTPOS  AS A_BESTPOS,
+  b.TXTLONG  AS B_TXTLONG,
+  c.AUFNR    AS C_AUFNR
+FROM E110 a
+LEFT JOIN B4000 b
+  ON b.FI_NR = a.FI_NR
+ AND b.TXT_NR = a.TXT_NR
+ AND b.TXT_ART = 'TQP'
+LEFT JOIN E1101 c
+  ON c.BESTNR  = a.BESTNR
+ AND c.BESTPOS = a.BESTPOS
+WHERE a.FI_NR   = :fiNr
+  AND a.BESTNR  = :bestnr
+ORDER BY a.BESTPOS
+SQL;
 
-        $stmt = $conn->prepare($sql);
-        $result = $stmt->executeQuery([
-            'fiNr' => $fiNr,
-            'bestnr' => $bestnr
-        ]);
+        $stmt   = $conn->prepare($sql);
+        $result = $stmt->executeQuery(['fiNr' => $fiNr, 'bestnr' => $bestnr]);
 
-        return array_map(function ($row) {
+        return array_map(static function(array $row) {
             return [
-                'fiNr' => $row['FI_NR'],
-                'bestnr' => $row['BESTNR'],
-                'bestpos' => $row['BESTPOS'],
-                'txtlong' => $row['TXTLONG'] ?? null,
+                'fiNr'    => $row['A_FI_NR'],
+                'bestnr'  => $row['A_BESTNR'],
+                'bestpos' => $row['A_BESTPOS'],
+                'txtlong' => $row['B_TXTLONG'] ?? null,
+                'aufnr'   => $row['C_AUFNR'] ?? null,
             ];
         }, $result->fetchAllAssociative());
     }
@@ -210,6 +217,8 @@ class IndexController extends AbstractController
                 return new JsonResponse(['status' => 'not_found'], JsonResponse::HTTP_NOT_FOUND);
             }
 
+            //dd($token->getUser());
+
             $entry = $results[0];
 
             return new JsonResponse([
@@ -218,6 +227,7 @@ class IndexController extends AbstractController
                 'email' => $entry->getAttribute('mail')[0] ?? null,
                 'firstname' => $entry->getAttribute('givenName')[0] ?? null,
                 'lastname' => $entry->getAttribute('sn')[0] ?? null,
+                'phone' => $entry->getAttribute('homePhone')[0] ?? null,
             ]);
         } catch (\Exception $e) {
             return new JsonResponse([
@@ -239,6 +249,7 @@ class IndexController extends AbstractController
         return $this->json([
             'status' => 'ok',
             'username' => $user->getUserIdentifier(),
+            'email' => $user->getEmail(),
         ]);
     }
 
@@ -283,6 +294,23 @@ class IndexController extends AbstractController
         }
 
         return new JsonResponse($orders, 200);
+    }
+
+    #[Route('/api/user', name: 'api_current_user', methods: ['GET'])]
+    public function current(?UserInterface $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['status' => 'unauthorized'], 401);
+        }
+
+        // Adjust to your LDAP fields if you map them on the User
+        return $this->json([
+            'status'    => 'ok',
+            'username'  => $user->getUserIdentifier(),
+            'email'     => method_exists($user, 'getEmail') ? $user->getEmail() : null,
+            'firstname' => method_exists($user, 'getFirstname') ? $user->getFirstname() : null,
+            'lastname'  => method_exists($user, 'getLastname') ? $user->getLastname() : null,
+        ]);
     }
 
     #[Route('/api/easy-product/exists', name: 'easy_product_exists', methods: ['GET'])]
@@ -363,10 +391,12 @@ class IndexController extends AbstractController
             }
 
             $orders[] = [
-                'orderid' => $orderEntity->getOrderId(),
-                'ordernr' => $orderEntity->getOrderNr(),
-                'status' => $orderEntity->getStatus(),
-                'products' => $products,
+                'orderid'   => $orderEntity->getOrderId(),
+                'ordernr'   => $orderEntity->getOrderNr(),
+                'appbestnr' => $orderEntity->getAppBestNr(),
+                'appposnr'  => $orderEntity->getAppposnr(),
+                'status'    => $orderEntity->getStatus(),
+                'products'  => $products,
             ];
         }
 

@@ -1,4 +1,5 @@
 const Encore = require('@symfony/webpack-encore');
+const path = require('path');
 
 // Runtime-Umgebung setzen
 if (!Encore.isRuntimeEnvironmentConfigured()) {
@@ -10,6 +11,9 @@ Encore
     .setPublicPath('/build')
 
     .addEntry('app', './assets/app.js')
+    .addAliases({
+      '@': path.resolve(__dirname, 'assets'),
+    })
 
     .copyFiles({
       from: './assets/images/',
@@ -28,7 +32,7 @@ Encore
     .enableSingleRuntimeChunk()
     .cleanupOutputBeforeBuild()
     .enableBuildNotifications()
-    .enableSourceMaps(!Encore.isProduction())
+    .enableSourceMaps(!Encore.isProduction(), true)
     .enableVersioning(Encore.isProduction())
 
 

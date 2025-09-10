@@ -655,6 +655,8 @@ class PimsOrderController extends AbstractController
         $orderNr   = $data['orderNr']   ?? null;   // PIMS ordernr
         $productId = $data['productId'] ?? null;   // PIMS productid
         $productNr = $data['productNr'] ?? null;   // PIMS productnr
+        $appBestNr = $data['appbestnr'] ?? null;   // APP Bestellnummer
+        $appPosNr  = $data['appposnr']  ?? null;   // APP Bestellnummer
 
         if (!$productId && !$productNr) {
             return new JsonResponse(['error' => 'Missing productId or productNr'], 400);
@@ -672,6 +674,8 @@ class PimsOrderController extends AbstractController
         $prod = new APPProduct();
         if ($productId) $prod->setProductId((string)$productId);
         if ($productNr) $prod->setProductNr((string)$productNr);
+        if ($appBestNr) $prod->setAppBestNr((string)$appBestNr);
+        if ($appPosNr)  $prod->setBestPosition((int)$appPosNr);
         if ($order)     $prod->setOrder($order);
 
         $em->persist($prod);

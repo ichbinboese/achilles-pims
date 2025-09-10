@@ -578,17 +578,17 @@ function getNextWeekday(weekday) {
   return today
 }
 
-// Berechne den nächsten Mittwoch (3) und Freitag (5)
-const nextTuesday = getNextWeekday(3)
+// Nächster Mittwoch (3) und Freitag (5)
+const nextWednesday = getNextWeekday(3)
 const nextFriday = getNextWeekday(5)
 
-// Bestimme, welcher der beiden Tage näher ist
-let nextDay = nextTuesday
-if (nextFriday - nextTuesday < 3 * 24 * 60 * 60 * 1000) {
+// Der nähere der beiden Tage
+let nextDay = nextWednesday
+if (nextFriday - nextWednesday < 3 * 24 * 60 * 60 * 1000) {
   nextDay = nextFriday
 }
 
-// Formatieren im "YYYY-MM-DD"-Format
+// "YYYY-MM-DD"
 const year = nextDay.getFullYear()
 const month = String(nextDay.getMonth() + 1).padStart(2, '0')
 const day = String(nextDay.getDate()).padStart(2, '0')

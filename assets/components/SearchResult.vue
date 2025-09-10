@@ -160,12 +160,16 @@ async function submitOrder() {
 
     // 3) Weiterleitung zur PimsProduct-Route
     router.push({
-      name: 'product',                   // vorhandene Route
+      name: 'product',
       params: {
         bestnr: selected.value.bestnr,
         position: selected.value.bestpos,
         orderid: String(orderid),
         ordernr: String(ordernr),
+      },
+      query: {
+        appbestnr: selected.value.bestnr,
+        appposnr: selected.value.bestpos,
       }
     })
   } catch (e) {

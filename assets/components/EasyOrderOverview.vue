@@ -39,7 +39,7 @@
           <td>{{ order.productStatus || 'Unbekannt' }}</td>
         </tr>
         <tr v-if="paged.length === 0">
-          <td colspan="6" class="text-center py-6 text-stone-500">Keine Einträge gefunden.</td>
+          <td colspan="6" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-600">Keine Einträge gefunden.</td>
         </tr>
         </tbody>
       </table>
@@ -193,7 +193,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-tbody tr:nth-child(odd) {
-  background-color: #f3f4f6; /* Tailwind: bg-gray-100 */
-}
+
 </style>
