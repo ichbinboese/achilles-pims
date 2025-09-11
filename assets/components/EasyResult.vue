@@ -505,6 +505,12 @@ async function submitOrder(item) {
     }
     const orderRes = await placePimsOrderViaProxy(orderPayload)
 
+    if (orderRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
+      console.error("PIMS Order Fehler:", productRes.data)
+      toast.error("Auftrag wurde bereits angelegt")
+      return
+    }
+
     let productRes = {}
     let parcelRes = {}
 
@@ -552,6 +558,12 @@ async function submitOrder(item) {
       form.append('wvkaschieren', wvkCode)
 
       productRes = await placePimsProductViaProxy(form)
+
+      if (productRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
+        console.error("PIMS Product Fehler:", productRes.data)
+        toast.error("Produkt wurde bereits angelegt")
+        return
+      }
 
       await submitParcel(productRes, orderRes, item)
 

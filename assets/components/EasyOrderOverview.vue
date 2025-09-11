@@ -4,13 +4,13 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
       <div class="flex items-center gap-2">
         <label for="searchOx" class="text-sm dark:text-stone-200">
-          Suche nach <code>Easy-Auftragsnummer</code>:
+          Suche nach Easy-Auftragsnummer:
         </label>
         <input
           id="searchOx"
           v-model.trim="search"
           type="text"
-          placeholder="z. B. 12345"
+          placeholder="auch Kurzform z.B. ...9356"
           class="w-56 p-2 border rounded-full dark:bg-stone-700 dark:text-white"
         />
       </div>
@@ -66,8 +66,20 @@
           </td>
         </tr>
 
-        <tr v-for="order in paged" :key="order.orderId">
-          <td>{{ order.oxordernr }}</td>
+        <tr v-for="order in paged" :key="order.orderId" class="odd:bg-gray-100 dark:odd:bg-stone-900">
+          <td>
+            <router-link
+              :to="{
+                  name: 'easy-result',
+                  query: {
+                    orderNr: order.oxordernr,
+                  }
+                }"
+              class="text-orange-600 hover:underline"
+            >
+              {{ order.oxordernr }}
+            </router-link>
+          </td>
           <td>{{ order.ddposition }}</td>
           <td>{{ order.orderNr }}</td>
           <td>{{ order.status || 'Unbekannt' }}</td>
@@ -271,11 +283,5 @@ onMounted(async () => {
 thead tr th {
   text-align: left;
   white-space: nowrap;
-}
-tbody tr:nth-child(odd) {
-  background-color: #f9fafb;
-}
-:deep(.dark) tbody tr:nth-child(odd) {
-  background-color: #1f2937;
 }
 </style>

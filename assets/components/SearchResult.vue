@@ -129,9 +129,10 @@ import { useAuthStore } from '../stores/auth.js'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+console.log(route.query.selected)
 
 const results = ref([])
-const selected = ref(null)           // <- korrekt: selected
+const selected = ref(route.query.selected || false)           // <- korrekt: selected
 const alreadyOrdered = ref(false)    // <- Flag für Button
 const showModal = ref(false)
 const showConfirm = ref(false)
@@ -189,6 +190,12 @@ async function submitOrder() {
 
   try {
     const orderRes = await axios.post('/api/proxy/pims-order', form)
+
+    if (orderRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
+      console.error("PIMS Order Fehler:", productRes.data)
+      toast.error("Auftrag wurde bereits angelegt")
+      return
+    }
 
     if (orderRes.data?.success !== 1) {
       toast.error('Bestellung konnte nicht erstellt werden.')

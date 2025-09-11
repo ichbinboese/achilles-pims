@@ -10,7 +10,7 @@
           id="searchOx"
           v-model.trim="search"
           type="text"
-          placeholder="z. B. BS2530 PR82017771 305AB…"
+          placeholder="z.B. 114AB... 114BE..."
           class="w-72 p-2 border rounded-full dark:bg-stone-700 dark:text-white"
         />
       </div>
@@ -69,9 +69,23 @@
           </td>
         </tr>
 
-        <tr v-for="order in paged" :key="order.orderId">
+        <tr v-for="order in paged" :key="order.orderId" class="odd:bg-gray-100 dark:odd:bg-stone-900">
           <td>{{ order.aufnr }}</td>
-          <td>{{ order.oxordernr }}</td>
+          <td>
+            <router-link
+              :to="{
+                name: 'result',
+                query: {
+                  fiNr: 114,
+                  bestnr: order.oxordernr,
+                  bestpos: order.ddposition,
+                }
+              }"
+              class="text-orange-600 hover:underline"
+            >
+              {{ order.oxordernr }}
+            </router-link>
+          </td>
           <td>{{ order.ddposition }}</td>
           <td>{{ order.orderNr }}</td>
           <td>{{ order.status || 'Unbekannt' }}</td>
@@ -350,11 +364,5 @@ onMounted(async () => {
 thead tr th {
   text-align: left;
   white-space: nowrap;
-}
-tbody tr:nth-child(odd) {
-  background-color: #f9fafb; /* light zebra */
-}
-:deep(.dark) tbody tr:nth-child(odd) {
-  background-color: #1f2937; /* dark zebra */
 }
 </style>

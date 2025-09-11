@@ -348,6 +348,12 @@ async function submitProduct() {
     const productRes = await axios.post('/api/proxy/pims-product', payload, { withCredentials: true })
     console.log('Product Response:', productRes.data)
 
+    if (productRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
+      console.error("PIMS Product Fehler:", productRes.data)
+      toast.error("Produkt wurde bereits angelegt")
+      return
+    }
+
     if (productRes.data?.success !== 1) {
       console.error('PIMS Product Fehler:', productRes.data)
       toast.error('Produkt anlegen fehlgeschlagen')
