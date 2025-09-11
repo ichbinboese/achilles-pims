@@ -505,6 +505,11 @@ async function submitOrder(item) {
     }
     const orderRes = await placePimsOrderViaProxy(orderPayload)
 
+    if (handlePimsErrors(orderRes.data)) {
+      console.error("PIMS Product Fehler:", orderRes.data)
+      return
+    }
+
     if (orderRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
       console.error("PIMS Order Fehler:", productRes.data)
       toast.error("Auftrag wurde bereits angelegt")
@@ -565,6 +570,11 @@ async function submitOrder(item) {
         return
       }
 
+      if (handlePimsErrors(productRes.data)) {
+        console.error("PIMS Product Fehler:", productRes.data)
+        return
+      }
+
       await submitParcel(productRes, orderRes, item)
 
       lastOrderResponse.value = { order: orderRes, product: productRes, parcel: parcelRes }
@@ -580,6 +590,17 @@ async function submitOrder(item) {
   } finally {
     submitting.value = false
   }
+}
+
+function handlePimsErrors(response) {
+  const errors = response?.errorlist?.error
+  if (!Array.isArray(errors)) return false
+
+  errors.forEach(err => {
+    toast.error(`${err.field}: ${err.text}`)
+  })
+
+  return true
 }
 
 function getNextWeekday(weekday) {

@@ -26,12 +26,10 @@ use App\Repository\EasyProductRepository;
 class IndexController extends AbstractController
 {
     private EntityManagerInterface $oracleManager;
-    private EntityManagerInterface $entityManager;
 
-    public function __construct(ManagerRegistry $registry, EntityManagerInterface $entityManager)
+    public function __construct(ManagerRegistry $registry)
     {
         $this->oracleManager = $registry->getManager('oracle');
-        $this->entityManager = $entityManager;
     }
 
     #[Route('/', name: 'home')]

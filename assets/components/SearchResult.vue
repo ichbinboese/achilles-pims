@@ -192,8 +192,13 @@ async function submitOrder() {
     const orderRes = await axios.post('/api/proxy/pims-order', form)
 
     if (orderRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
-      console.error("PIMS Order Fehler:", productRes.data)
+      console.error("PIMS Order Fehler:", orderRes.data)
       toast.error("Auftrag wurde bereits angelegt")
+      return
+    }
+
+    if (handlePimsErrors(orderRes.data)) {
+      console.error("PIMS Order Fehler:",orderRes.data)
       return
     }
 
@@ -269,6 +274,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function handlePimsErrors(response) {
+  const errors = response?.errorlist?.error
+  if (!Array.isArray(errors)) return false
+
+  errors.forEach(err => {
+    toast.error(`${err.field}: ${err.text}`)
+  })
+
+  return true
+}
 </script>
 
 <style scoped>

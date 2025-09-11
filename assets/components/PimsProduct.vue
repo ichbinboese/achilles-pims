@@ -354,6 +354,11 @@ async function submitProduct() {
       return
     }
 
+    if (handlePimsErrors(productRes.data)) {
+      console.error("PIMS Product Fehler:", productRes.data)
+      return
+    }
+
     if (productRes.data?.success !== 1) {
       console.error('PIMS Product Fehler:', productRes.data)
       toast.error('Produkt anlegen fehlgeschlagen')
@@ -366,7 +371,6 @@ async function submitProduct() {
     // WICHTIG: productId an Parcel übergeben
     await submitParcel(productId, mail)
 
-    toast.success(`Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`)
     navigateWithToast('app-orders', {}, {}, `Produkt angelegt: ${productRes.data.productnr || productRes.data.productid}`, 'success')
   } catch (e) {
     console.error(e)
@@ -374,6 +378,16 @@ async function submitProduct() {
   }
 }
 
+function handlePimsErrors(response) {
+  const errors = response?.errorlist?.error
+  if (!Array.isArray(errors)) return false
+
+  errors.forEach(err => {
+    toast.error(`${err.field}: ${err.text}`)
+  })
+
+  return true
+}
 
 function getNextWeekday(weekday) {
   const today = new Date()
