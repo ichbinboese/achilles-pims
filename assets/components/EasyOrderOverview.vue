@@ -3,7 +3,9 @@
     <!-- Toolbar: Suche + Zähler -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
       <div class="flex items-center gap-2">
-        <label for="searchOx" class="text-sm dark:text-stone-200">Suche nach <code>Easy-Auftragsnummer</code>:</label>
+        <label for="searchOx" class="text-sm dark:text-stone-200">
+          Suche nach <code>Easy-Auftragsnummer</code>:
+        </label>
         <input
           id="searchOx"
           v-model.trim="search"
@@ -14,6 +16,33 @@
       </div>
       <div class="text-sm text-stone-600 dark:text-stone-300">
         Gefunden: {{ filtered.length }} · Seite {{ currentPage }} / {{ totalPages || 1 }}
+      </div>
+    </div>
+
+    <!-- Loader / Progressbar -->
+    <div
+      v-if="!allLoaded"
+      class="mb-4 rounded-lg border border-orange-200 dark:border-stone-700 bg-orange-50 dark:bg-stone-900"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm text-stone-700 dark:text-stone-200">
+            <span class="font-medium">Lade Daten…</span>
+            <span class="ml-1 opacity-80">(Datensätze {{ completedSteps }} / {{ totalSteps }})</span>
+          </div>
+          <div class="text-sm tabular-nums text-stone-600 dark:text-stone-300">
+            {{ progressPercent }}%
+          </div>
+        </div>
+        <div class="mt-2 h-2 w-full rounded-full bg-orange-100 dark:bg-stone-700 overflow-hidden">
+          <div
+            class="h-2 bg-orange-500 transition-all"
+            :style="{ width: progressPercent + '%' }"
+            aria-label="Fortschritt der Daten-Ladung"
+          />
+        </div>
       </div>
     </div>
 
@@ -30,6 +59,13 @@
         </tr>
         </thead>
         <tbody>
+        <!-- Skeleton-Zeilen solange noch geladen wird -->
+        <tr v-if="!allLoaded" v-for="n in 3" :key="'skeleton-'+n" class="animate-pulse">
+          <td colspan="6" class="py-3">
+            <div class="h-3 w-1/2 bg-stone-200 dark:bg-stone-700 rounded"></div>
+          </td>
+        </tr>
+
         <tr v-for="order in paged" :key="order.orderId">
           <td>{{ order.oxordernr }}</td>
           <td>{{ order.ddposition }}</td>
@@ -38,8 +74,11 @@
           <td>{{ order.productNr || 'Unbekannt' }}</td>
           <td>{{ order.productStatus || 'Unbekannt' }}</td>
         </tr>
-        <tr v-if="paged.length === 0">
-          <td colspan="6" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-600">Keine Einträge gefunden.</td>
+
+        <tr v-if="paged.length === 0 && allLoaded">
+          <td colspan="6" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-600">
+            Keine Einträge gefunden.
+          </td>
         </tr>
         </tbody>
       </table>
@@ -53,7 +92,7 @@
         @click="goPrev"
         aria-label="Vorherige Seite"
       >
-        << Zurück
+        &laquo; Zurück
       </button>
 
       <div class="flex items-center gap-1">
@@ -79,7 +118,7 @@
         @click="goNext"
         aria-label="Nächste Seite"
       >
-        Weiter >>
+        Weiter &raquo;
       </button>
     </div>
   </div>
@@ -96,7 +135,6 @@ const search = ref('');
 const currentPage = ref(1);
 const pageSize = 20; // max. 20 Datensätze pro Seite
 
-// Suche resetten -> immer auf Seite 1 springen
 watch(search, () => {
   currentPage.value = 1;
 });
@@ -129,16 +167,13 @@ const pageButtons = computed(() => {
   const buttons = [];
   const tp = totalPages.value || 1;
   const cp = currentPage.value;
-
   const add = (label, page, opts = {}) => buttons.push({ key: `${label}-${page ?? 'x'}`, label, page, ...opts });
 
-  // Wenige Seiten -> alle anzeigen
   if (tp <= 7) {
     for (let i = 1; i <= tp; i++) add(i, i);
     return buttons;
   }
 
-  // Mehr Seiten -> komprimiert
   add(1, 1);
   if (cp > 3) add('…', null, { ellipsis: true, disabled: true });
 
@@ -152,33 +187,66 @@ const pageButtons = computed(() => {
   return buttons;
 });
 
+// ===== Loader / Progress =====
+const isLoading = ref(true);
+const progressPercent = ref(0);     // 0..100
+const totalSteps = ref(2);          // (1) /api/orders + (2) status-batch
+const completedSteps = ref(0);
+
+const allLoaded = computed(() => !isLoading.value && progressPercent.value >= 100);
+
+function resetProgress() {
+  isLoading.value = true;
+  progressPercent.value = 0;
+  totalSteps.value = 2;
+  completedSteps.value = 0;
+}
+
+function bump(step = 1) {
+  completedSteps.value = Math.min(totalSteps.value, completedSteps.value + step);
+  const pct = totalSteps.value > 0 ? Math.round((completedSteps.value / totalSteps.value) * 100) : 0;
+  progressPercent.value = Math.min(100, Math.max(0, pct));
+}
+
 onMounted(async () => {
+  resetProgress();
+
   try {
+    // STEP 1: Grunddaten
     const { data } = await axios.get('/api/orders');
+    bump(1);
 
     // Normalisieren inkl. oxordernr
-    const normalized = data.map(o => ({
+    const normalized = (data || []).map(o => ({
       orderId: String(o.orderid ?? '').trim(),
       orderNr: String(o.ordernr ?? '').trim(),
       oxordernr: o.products?.[0]?.oxOrderNr ?? '—',
-      ddposition: o.products?.[0]?.ddPosition ?? '—',
+      ddposition: o.products?.[0]?.ddPosition != null ? (o.products[0].ddPosition * 10) : '—', // wie in deiner Vorlage
     }));
 
     const ids = normalized.map(o => o.orderId);
 
-    const { data: batch } = await axios.post(
-      '/api/proxy/pims-order-status/batch',
-      { orderids: ids },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+    // STEP 2: Status-Batch
+    // selbst wenn ids leer sind, bumpen wir, damit der Loader sauber endet
+    let batchItems = [];
+    try {
+      const { data: batch } = await axios.post(
+        '/api/proxy/pims-order-status/batch',
+        { orderids: ids },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      batchItems = batch?.items || [];
+    } finally {
+      bump(1);
+    }
 
     const byId = Object.fromEntries(normalized.map(o => [o.orderId, o]));
 
-    ordersWithStatus.value = (batch.items || []).map(item => ({
+    ordersWithStatus.value = batchItems.map(item => ({
       orderId: item.orderId,
       orderNr: byId[item.orderId]?.orderNr || item.orderNr || '—',
       oxordernr: byId[item.orderId]?.oxordernr || '—',
-      ddposition: byId[item.orderId]?.ddposition * 10 || '—',
+      ddposition: byId[item.orderId]?.ddposition ?? '—',
       productNr: item.productNr || 'Unbekannt',
       status: item.status || 'Unbekannt',
       productStatus: item.productStatus || 'Unbekannt',
@@ -188,10 +256,26 @@ onMounted(async () => {
     if (err.response) {
       console.error('Response data:', err.response.data);
     }
+  } finally {
+    progressPercent.value = 100;
+    isLoading.value = false;
   }
 });
 </script>
 
 <style scoped>
-
+.table th, .table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+thead tr th {
+  text-align: left;
+  white-space: nowrap;
+}
+tbody tr:nth-child(odd) {
+  background-color: #f9fafb;
+}
+:deep(.dark) tbody tr:nth-child(odd) {
+  background-color: #1f2937;
+}
 </style>

@@ -11,7 +11,7 @@
           <ul class="space-y-2">
             <li
               v-for="item in results"
-              :key="item.bestpos"
+              :key="`${item.bestnr}-${item.bestpos}`"
               @click="selectPosition(item)"
               class="cursor-pointer px-4 py-2 rounded-full border border-stone-300 hover:bg-orange-100 dark:hover:bg-orange-600 transition"
             >
@@ -25,7 +25,7 @@
     <!-- Lade-/Fehlerzustände -->
     <div v-if="loading" class="text-stone-600">Lade Daten…</div>
     <div v-else-if="error" class="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4">
-      { '{' } error { '}' }
+      {{ error }}
     </div>
 
     <!-- Anzeige der gewählten Bestellung -->
@@ -64,9 +64,33 @@
         </table>
       </div>
 
-      <!-- Absende-Button -->
+      <!-- Aktionen -->
       <div class="flex items-center gap-3">
+        <!-- Bereits bestellt => Link zur vorhandenen Product-Route -->
+        <router-link
+          v-if="selected && alreadyOrdered && existing"
+          :to="{
+      name: 'product',
+      params: {
+        bestnr: selected.bestnr,
+        position: selected.bestpos,
+        orderid: existing.orderid,
+        ordernr: existing.ordernr
+      },
+      query: {
+        appbestnr: selected.bestnr,
+        appposnr: selected.bestpos
+      }
+    }"
+          class="px-3 py-2 rounded bg-lime-600 dark:bg-lime-500 text-white"
+          title="Diese Position wurde bereits bestellt – zur Produktseite"
+        >
+          bereits bestellt
+        </router-link>
+
+        <!-- Bestellung erfassen -->
         <button
+          v-else
           @click="showConfirm = true"
           class="inline-flex items-center bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full"
         >
@@ -95,7 +119,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import md5 from 'crypto-js/md5'
@@ -107,19 +131,48 @@ const router = useRouter()
 const toast = useToast()
 
 const results = ref([])
-const selected = ref(null)
+const selected = ref(null)           // <- korrekt: selected
+const alreadyOrdered = ref(false)    // <- Flag für Button
 const showModal = ref(false)
 const showConfirm = ref(false)
 const loading = ref(true)
 const error = ref(null)
 
-function selectPosition(item) {
+const existing = ref(null) // { orderid, ordernr } falls schon vorhanden
+
+async function checkAlreadyOrdered(appbestnr, appposnr) {
+  try {
+    const { data } = await axios.get('/api/app-order/by-app', { // <- neuer Endpoint
+      params: { appbestnr, appposnr }
+    })
+    // Erwartet: { exists: boolean, orderid?: string|number, ordernr?: string|number }
+    if (data?.exists) {
+      existing.value = { orderid: String(data.orderid), ordernr: String(data.ordernr) }
+      return true
+    }
+    existing.value = null
+    return false
+  } catch (e) {
+    console.warn('Check alreadyOrdered fehlgeschlagen:', e)
+    existing.value = null
+    return false
+  }
+}
+
+async function selectPosition(item) {
   selected.value = item
   showModal.value = false
+
+  const appbestnr = String(item.bestnr ?? '').trim()
+  const appposnr = Number(item.bestpos ?? 0)
+
+  alreadyOrdered.value = await checkAlreadyOrdered(appbestnr, appposnr)
 }
 
 async function submitOrder() {
   if (!selected.value) return
+  if (alreadyOrdered.value) return
+
   const uniqueId = md5(`${selected.value.bestnr}-${selected.value.bestpos}`).toString()
 
   const form = new FormData()
@@ -135,10 +188,7 @@ async function submitOrder() {
   form.append('payment', 'rechnung')
 
   try {
-
-    const orderRes = await axios.post('/api/proxy/pims-order', form);
-
-    console.log(orderRes.data)
+    const orderRes = await axios.post('/api/proxy/pims-order', form)
 
     if (orderRes.data?.success !== 1) {
       toast.error('Bestellung konnte nicht erstellt werden.')
@@ -147,8 +197,6 @@ async function submitOrder() {
 
     const { orderid, ordernr } = orderRes.data
 
-    // 2) APPOrder in deiner DB anlegen (Entity Main\APPOrder)
-    //    -> appbestnr, appposnr + orderId/ orderNr setzen
     await axios.post('/api/app-order', {
       appbestnr: selected.value.bestnr,
       appposnr: selected.value.bestpos,
@@ -158,7 +206,6 @@ async function submitOrder() {
 
     toast.success(`Bestellung erfolgreich erstellt: ${ordernr}`)
 
-    // 3) Weiterleitung zur PimsProduct-Route
     router.push({
       name: 'product',
       params: {
@@ -180,29 +227,37 @@ async function submitOrder() {
   }
 }
 
+watch(selected, async (val) => {
+  if (val) {
+    const appbestnr = String(val.bestnr ?? '').trim()
+    const appposnr = Number(val.bestpos ?? 0)
+    alreadyOrdered.value = await checkAlreadyOrdered(appbestnr, appposnr)
+  } else {
+    alreadyOrdered.value = false
+  }
+})
 
 onMounted(async () => {
   try {
+    loading.value = true
+    error.value = null
+
     const { fiNr, bestnr } = route.query
-    const response = await axios.get('/api/bestellung', { params: { fiNr, bestnr } })
     const auth = useAuthStore()
+    if (!auth.user) await auth.fetchUser()
 
-    if (!auth.user) {
-      await auth.fetchUser()
-    }
-
-    results.value = response.data
-    console.log(results.value)
+    const response = await axios.get('/api/bestellung', { params: { fiNr, bestnr } })
+    results.value = Array.isArray(response.data) ? response.data : []
 
     if (results.value.length === 1) {
-      selectPosition(results.value[0])
+      await selectPosition(results.value[0])
     } else if (results.value.length > 1) {
       showModal.value = true
     } else {
       error.value = 'Keine Ergebnisse gefunden.'
     }
   } catch (err) {
-    error.value = err.response?.data?.message || err.message
+    error.value = err?.response?.data?.message || err?.message || 'Fehler beim Laden.'
   } finally {
     loading.value = false
   }

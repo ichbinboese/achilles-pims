@@ -7,6 +7,8 @@ use App\Entity\Main\EasyOrder;
 use App\Entity\Main\EasyProduct;
 use App\Entity\Main\APPOrder;
 
+use App\Repository\APPOrderRepository;
+use App\Repository\APPProductRepository;
 use Symfony\Component\Ldap\Ldap;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -314,7 +316,7 @@ SQL;
     }
 
     #[Route('/api/easy-product/exists', name: 'easy_product_exists', methods: ['GET'])]
-    public function exists(Request $req, EasyProductRepository $repo): JsonResponse
+    public function existsEasy(Request $req, EasyProductRepository $repo): JsonResponse
     {
         // Param-Namen exakt so wie im Frontend:
         $ox = $req->query->get('oxordernr');     // z.B. "305AB2103152"
@@ -327,6 +329,48 @@ SQL;
         $exists = $repo->existsByOxOrderNrAndDdPosition($ox, $pos);
         return new JsonResponse(['exists' => $exists]);
     }
+
+    #[Route('/api/app-product/exists', name: 'app_product_exists', methods: ['GET'])]
+    public function existsApp(Request $req, APPProductRepository $repo): JsonResponse
+    {
+        // Param-Namen exakt so wie im Frontend:
+        $ox = $req->query->get('appbestnr');
+        $pos = $req->query->getInt('appposnr');
+
+        if (!$ox || $pos === 0) {
+            return new JsonResponse(['exists' => false, 'error' => 'missing params'], 400);
+        }
+
+        $exists = $repo->existsByAppBestNrAndAppPosNr($ox, $pos);
+        return new JsonResponse(['exists' => $exists]);
+    }
+
+    #[Route('/api/app-order/by-app', name: 'app_order_by_app', methods: ['GET'])]
+    public function getByApp(Request $req, APPOrderRepository $repo): JsonResponse
+    {
+        $ox  = $req->query->get('appbestnr');
+        $pos = $req->query->getInt('appposnr');
+
+        if (!$ox || $pos === 0) {
+            return new JsonResponse(['exists' => false, 'error' => 'missing params'], 400);
+        }
+
+        $order = $repo->findOneBy([
+            'appbestnr' => $ox,
+            'appposnr'  => $pos,
+        ]);
+
+        if (!$order) {
+            return new JsonResponse(['exists' => false]);
+        }
+
+        return new JsonResponse([
+            'exists'  => true,
+            'orderid' => $order->getOrderId(),
+            'ordernr' => $order->getOrderNr(),
+        ]);
+    }
+
 
     #[Route('/api/orders/orderid', name: 'api_orders_orderid', methods: ['GET'])]
     public function findOrderId(

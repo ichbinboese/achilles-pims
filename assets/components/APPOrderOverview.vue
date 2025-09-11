@@ -19,6 +19,35 @@
       </div>
     </div>
 
+    <!-- Loader / Progressbar (sichtbar solange nicht komplett geladen) -->
+    <div
+      v-if="!allLoaded"
+      class="mb-4 rounded-lg border border-orange-200 dark:border-stone-700 bg-orange-50 dark:bg-stone-900"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm text-stone-700 dark:text-stone-200">
+            <span class="font-medium">Lade Daten…</span>
+            <template v-if="uniqueBestnrTotal > 0">
+              (Datensätze {{ processedBestnr }} / {{ uniqueBestnrTotal }})
+            </template>
+          </div>
+          <div class="text-sm tabular-nums text-stone-600 dark:text-stone-300">
+            {{ progressPercent }}%
+          </div>
+        </div>
+        <div class="mt-2 h-2 w-full rounded-full bg-orange-100 dark:bg-stone-700 overflow-hidden">
+          <div
+            class="h-2 bg-orange-500 transition-all"
+            :style="{ width: progressPercent + '%' }"
+            aria-label="Fortschritt der Daten-Ladung"
+          />
+        </div>
+      </div>
+    </div>
+
     <div class="order-overview text-left overflow-x-auto">
       <table class="table w-full">
         <thead>
@@ -33,6 +62,13 @@
         </tr>
         </thead>
         <tbody>
+        <!-- Skeleton-Zeilen solange noch geladen wird -->
+        <tr v-if="!allLoaded" v-for="n in 3" :key="'skeleton-'+n" class="animate-pulse">
+          <td colspan="7" class="py-3">
+            <div class="h-3 w-1/2 bg-stone-200 dark:bg-stone-700 rounded"></div>
+          </td>
+        </tr>
+
         <tr v-for="order in paged" :key="order.orderId">
           <td>{{ order.aufnr }}</td>
           <td>{{ order.oxordernr }}</td>
@@ -42,8 +78,11 @@
           <td>{{ order.productNr || 'Unbekannt' }}</td>
           <td>{{ order.productStatus || 'Unbekannt' }}</td>
         </tr>
-        <tr v-if="paged.length === 0">
-          <td colspan="6" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-800">Keine Einträge gefunden.</td>
+
+        <tr v-if="paged.length === 0 && allLoaded">
+          <td colspan="7" class="text-center py-6 text-stone-500 odd:bg-gray-100 dark:odd:bg-stone-800">
+            Keine Einträge gefunden.
+          </td>
         </tr>
         </tbody>
       </table>
@@ -57,7 +96,7 @@
         @click="goPrev"
         aria-label="Vorherige Seite"
       >
-        << Zurück
+        &laquo; Zurück
       </button>
 
       <div class="flex items-center gap-1">
@@ -83,7 +122,7 @@
         @click="goNext"
         aria-label="Nächste Seite"
       >
-        Weiter >>
+        Weiter &raquo;
       </button>
     </div>
   </div>
@@ -92,10 +131,11 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useToast } from "vue-toastification";
+import { useToast } from 'vue-toastification';
 import axios from 'axios';
-const route = useRoute()
-const toast = useToast()
+
+const route = useRoute();
+const toast = useToast();
 
 const ordersWithStatus = ref([]);
 
@@ -114,7 +154,6 @@ const filtered = computed(() => {
   const tokens = q.split(/\s+/).filter(Boolean);
 
   return ordersWithStatus.value.filter(o => {
-    // alle relevanten Felder zu Strings machen
     const fields = [
       o.aufnr,
       o.oxordernr,
@@ -122,9 +161,8 @@ const filtered = computed(() => {
       o.productNr,
     ]
       .map(v => String(v ?? '').toLowerCase().trim())
-      .filter(Boolean); // leere raus
+      .filter(Boolean);
 
-    // Jeder Token muss in mind. einem Feld vorkommen
     return tokens.every(t => fields.some(f => f.includes(t)));
   });
 });
@@ -156,10 +194,38 @@ const pageButtons = computed(() => {
   return buttons;
 });
 
-// ===== helper: aufnr-Index bauen =====
+// ===== Loader / Progress =====
+const isLoading = ref(true);
+const progressPercent = ref(0);            // 0..100
+const totalSteps = ref(1);                 // wird nach Grundliste neu gesetzt
+const completedSteps = ref(0);
+
+// Für die Statuszeile: wie viele BESTNR-Lookups stehen an / sind fertig?
+const uniqueBestnrTotal = ref(0);
+const processedBestnr = ref(0);
+
+const allLoaded = computed(() => !isLoading.value && progressPercent.value >= 100);
+
+function resetProgress() {
+  isLoading.value = true;
+  progressPercent.value = 0;
+  totalSteps.value = 1;
+  completedSteps.value = 0;
+  uniqueBestnrTotal.value = 0;
+  processedBestnr.value = 0;
+}
+
+function bump(step = 1) {
+  completedSteps.value += step;
+  // Schutz vor Division durch 0
+  const pct = totalSteps.value > 0 ? Math.round((completedSteps.value / totalSteps.value) * 100) : 0;
+  progressPercent.value = Math.min(100, Math.max(0, pct));
+}
+
+// ===== helper: aufnr-Index bauen (mit Progress-Callback) =====
 const FI_NR = 114;
 
-async function buildAufnrIndex(fiNr, normalizedList) {
+async function buildAufnrIndex(fiNr, normalizedList, onStep = () => {}) {
   const uniqueBestnrs = Array.from(
     new Set(
       normalizedList
@@ -168,21 +234,26 @@ async function buildAufnrIndex(fiNr, normalizedList) {
     )
   );
 
+  uniqueBestnrTotal.value = uniqueBestnrs.length;
+
   const index = new Map(); // key: `${bestnr}|${bestpos}` -> aufnr
 
+  // Parallel abrufen, aber Schrittzähler nach JEDEM Request erhöhen
   await Promise.all(
     uniqueBestnrs.map(async (bestnr) => {
       try {
         const { data } = await axios.get('/api/bestellung', {
           params: { fiNr, bestnr }
         });
-        // data: [{ fiNr, bestnr, bestpos, txtlong, aufnr }]
         (data || []).forEach(row => {
           const key = `${String(row.bestnr).trim()}|${String(row.bestpos).trim()}`;
           index.set(key, row.aufnr ?? null);
         });
       } catch (e) {
         console.error('Fehler beim Laden /api/bestellung für', { fiNr, bestnr }, e);
+      } finally {
+        processedBestnr.value += 1;
+        onStep(1); // Fortschritt für diesen Lookup
       }
     })
   );
@@ -191,58 +262,68 @@ async function buildAufnrIndex(fiNr, normalizedList) {
 }
 
 onMounted(async () => {
+  resetProgress();
 
+  // Toast aus Querystring anzeigen (falls vorhanden)
   if (route.query.toastMessage) {
-    toast[route.query.toastType || 'success'](route.query.toastMessage)
+    const type = route.query.toastType || 'success';
+    const msg = String(route.query.toastMessage);
+    if (typeof toast[type] === 'function') {
+      toast[type](msg);
+    } else {
+      toast.success(msg);
+    }
   }
 
   try {
-    // 1) Grunddaten laden
+    // STEP 1: Grunddaten laden
     const { data } = await axios.get('/api/app-orders');
+    bump(1); // initialer Schritt erledigt
 
-    // 2) Normalisieren + Basisfelder (inkl. oxordernr/bestnr + ddposition/bestpos)
-    const normalizedBase = data.map(o => ({
+    // Normalisieren + Basisfelder
+    const normalizedBase = (data || []).map(o => ({
       orderId: String(o.orderid ?? '').trim(),
       orderNr: String(o.ordernr ?? '').trim(),
       appbestnr: String(o.appbestnr ?? '').trim(),
       appposnr: String(o.appposnr ?? '').trim(),
       oxordernr: String(o.appbestnr ?? '').trim(),   // BESTNR
-      ddposition: String(o.appposnr ?? '').trim(), // BESTPOS
+      ddposition: String(o.appposnr ?? '').trim(),   // BESTPOS
     }));
 
-    // 3) aufnr-Index aufbauen (ein Request pro unique BESTNR)
-    const aufnrIndex = await buildAufnrIndex(FI_NR, normalizedBase);
+    // Jetzt kennen wir die Anzahl der BESTNR-Lookups → totalSteps aktualisieren:
+    // total = 1 (Grundliste) + uniqueBestnr + 1 (Status-Batch)
+    const uniqueCount = Array.from(new Set(normalizedBase.map(o => o.oxordernr).filter(Boolean))).length;
+    totalSteps.value = 1 + uniqueCount + 1;
 
-    // 4) normalized um 'aufnr' erweitern
+    // STEP 2: AUFNR-Index aufbauen (mit Progress)
+    const aufnrIndex = await buildAufnrIndex(FI_NR, normalizedBase, bump);
+
+    // AUFNR mergen
     const normalized = normalizedBase.map(o => {
       const bestnr = String(o.appbestnr || '').trim();
       const bestpos = String(o.appposnr || '').trim();
       const key = `${bestnr}|${bestpos}`;
       const aufnr = bestnr && bestpos ? (aufnrIndex.get(key) ?? '—') : '—';
-
-      return {
-        ...o,
-        aufnr, // <-- HIER ist die gewünschte AUFNR drin
-      };
+      return { ...o, aufnr };
     });
 
-    // 5) Status-Batch laden wie gehabt
+    // STEP 3: Status-Batch
     const ids = normalized.map(o => o.orderId);
     const { data: batch } = await axios.post(
       '/api/proxy/pims-order-status/batch',
       { orderids: ids },
       { headers: { 'Content-Type': 'application/json' } }
     );
+    bump(1); // Batch erledigt
 
     const byId = Object.fromEntries(normalized.map(o => [o.orderId, o]));
 
-    // 6) Finales Merge – 'aufnr' bleibt erhalten
-    ordersWithStatus.value = (batch.items || []).map(item => ({
+    ordersWithStatus.value = (batch?.items || []).map(item => ({
       orderId: item.orderId,
       orderNr: byId[item.orderId]?.orderNr || item.orderNr || '—',
       oxordernr: byId[item.orderId]?.oxordernr || '—',
       ddposition: byId[item.orderId]?.ddposition || '—',
-      aufnr: byId[item.orderId]?.aufnr || '—', // <- verfügbar (falls du's später anzeigen willst)
+      aufnr: byId[item.orderId]?.aufnr || '—',
       productNr: item.productNr || 'Unbekannt',
       status: item.status || 'Unbekannt',
       productStatus: item.productStatus || 'Unbekannt',
@@ -252,11 +333,28 @@ onMounted(async () => {
     if (err.response) {
       console.error('Response data:', err.response.data);
     }
+  } finally {
+    // Falls einzelne Schritte fehlten, den Fortschritt sauber beenden
+    progressPercent.value = 100;
+    isLoading.value = false;
   }
 });
 </script>
 
-
 <style scoped>
-
+/* Optional: kleine Verbesserungen für Tabellen-Looks – Tailwind-first, aber hier neutral gehalten. */
+.table th, .table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+thead tr th {
+  text-align: left;
+  white-space: nowrap;
+}
+tbody tr:nth-child(odd) {
+  background-color: #f9fafb; /* light zebra */
+}
+:deep(.dark) tbody tr:nth-child(odd) {
+  background-color: #1f2937; /* dark zebra */
+}
 </style>
