@@ -309,7 +309,8 @@ const mappedCodes = reactive({
   product: null,
   paper: null,
   color: null,
-  wvkaschieren: null
+  wvkaschieren: null,
+  wvheftung: null,
 })
 
 const productForm = reactive({
@@ -414,6 +415,9 @@ async function fetchMappings(oxartnum) {
       ? { value: 'pd5624', label: '300g Bilderdruck matt' }
       : { value: 'pd5618', label: '135g Bilderdruck matt' }
     mappedCodes.color = c.color ?? null
+    mappedCodes.register = (oxartnum.startsWith('REG-'))
+      ? { value: 'heftung_lose', label: 'wvheftung' }
+      : { value: null, label: null }
     mappedCodes.wvkaschieren = c.wvkaschieren ?? null
 
     if (!getCode(mappedCodes.product) && !getCode(mappedCodes.paper) && !getCode(mappedCodes.color) && !getCode(mappedCodes.wvkaschieren)) {
@@ -563,6 +567,7 @@ async function submitOrder(item) {
       const paperCode   = getCode(mappedCodes.paper?.value)
       const colorCode   = getCode(mappedCodes.color)
       const wvkCode     = getCode(mappedCodes.wvkaschieren)
+      const wvheftung   = getCode(mappedCodes.wvheftung?.value)
 
       const missing = []
       if (!productCode) missing.push('Produkt')
@@ -595,6 +600,7 @@ async function submitOrder(item) {
       form.append('checkmail', 'info@easyordner.de')
       form.append('neutral',   'N')
       form.append('wvkaschieren', wvkCode)
+      if (wvheftung) form.append('wvheftung', wvheftung)
 
       form.append('file_front', fileFront.value, fileFront.value.name)
       if (fileBack.value) form.append('file_back', fileBack.value, fileBack.value.name)
