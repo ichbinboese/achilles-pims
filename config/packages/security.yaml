@@ -17,7 +17,9 @@ security:
             custom_authenticators:
                 - App\Security\LdapApiAuthenticator
             logout:
-                path: /api/logout
+                path: app_logout
+                invalidate_session: true
+                delete_cookies: ['PHPSESSID']
             remember_me:
                 secret: '%kernel.secret%'
                 lifetime: 604800

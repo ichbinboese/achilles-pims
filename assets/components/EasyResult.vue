@@ -251,10 +251,31 @@
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import {useToast} from "vue-toastification";
+import { useToast } from 'vue-toastification'
 
 const route = useRoute()
 const toast = useToast()
+
+// --- Sichtbare Fehler/Toasts global ---
+axios.interceptors.response.use(
+  r => r,
+  err => {
+    console.error('AXIOS ERROR:', err?.config?.url, err?.response?.status, err?.response?.data || err.message)
+    const msg = err?.response?.data?.error || err?.response?.data?.message || err.message || 'Unbekannter Fehler'
+    try { error.value = msg } catch {}
+    try { toast.error(String(msg)) } catch {}
+    return Promise.reject(err)
+  }
+)
+window.addEventListener('error', (ev) => {
+  console.error('WINDOW ERROR:', ev.message, ev.filename, ev.lineno, ev.error)
+  try { toast.error('JS-Fehler: ' + ev.message) } catch {}
+})
+window.addEventListener('unhandledrejection', (ev) => {
+  console.error('PROMISE REJECTION:', ev.reason)
+  try { toast.error('Fehler (Promise): ' + (ev.reason?.message || String(ev.reason))) } catch {}
+})
+
 const orderNr = route.query.orderNr || ''
 const loading = ref(true)
 const submitting = ref(false)
@@ -335,7 +356,6 @@ onMounted(async () => {
       productForm.pages = 1
       await fetchMappings(selectedItem.value.oxartnum)
       await applySizeFromOxartnum(selectedItem.value.oxartnum)
-      // Hier den Already-Ordered-Check machen
       alreadyOrdered.value = await checkAlreadyOrdered(
         selectedItem.value.oxordernr,
         selectedItem.value.ddposition
@@ -426,7 +446,6 @@ async function selectPosition(item) {
   showModal.value = false
   await fetchMappings(item.oxartnum)
   await applySizeFromOxartnum(item.oxartnum)
-  // ebenfalls prüfen
   alreadyOrdered.value = await checkAlreadyOrdered(item.oxordernr, item.ddposition)
   toast.success(`Auftrag ${item.oxordernr} - ${item.ddposition*10} geladen!`)
 }
@@ -491,6 +510,8 @@ async function submitOrder(item) {
   lastOrderResponse.value = null
 
   try {
+    toast.info('Leite Bestellung an PIMS weiter …')
+
     const orderPayload = {
       uniqueid: `${item.oxordernr}-${item.ddposition * 10}`,
       title: 'firma',
@@ -503,16 +524,29 @@ async function submitOrder(item) {
       vat: '0.19',
       payment: 'rechnung'
     }
-    const orderRes = await placePimsOrderViaProxy(orderPayload)
 
-    if (handlePimsErrors(orderRes.data)) {
-      console.error("PIMS Product Fehler:", orderRes.data)
+    // ---- ORDER anlegen
+    const orderRes = await placePimsOrderViaProxy(orderPayload)
+    console.log('ORDER RES:', orderRes)
+
+    // Fehlerliste prüfen
+    if (handlePimsErrors(orderRes)) {
+      submitting.value = false
+      console.error('PIMS Order Fehler:', orderRes)
       return
     }
-
-    if (orderRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
-      console.error("PIMS Order Fehler:", productRes.data)
-      toast.error("Auftrag wurde bereits angelegt")
+    // AlreadyTransferred prüfen
+    if (orderRes?.errorlist?.error?.some(e => e.text === 'AlreadyTransferred')) {
+      submitting.value = false
+      console.error('PIMS Order Fehler:', orderRes)
+      toast.error('Auftrag wurde bereits angelegt')
+      return
+    }
+    // Minimalvalidierung
+    if (!orderRes || (!orderRes.orderid && !orderRes.ordernr)) {
+      submitting.value = false
+      error.value = 'PIMS Order konnte nicht angelegt werden (keine orderid/ordernr).'
+      toast.error(error.value)
       return
     }
 
@@ -520,66 +554,84 @@ async function submitOrder(item) {
     let parcelRes = {}
 
     if (orderRes?.orderid && orderRes?.ordernr) {
+      // ggf. Mapping nachladen
       if (!mappedCodes.product || !mappedCodes.paper || !mappedCodes.color) {
         await fetchMappings(item.oxartnum)
       }
 
       const productCode = getCode(mappedCodes.product)
-      const paperCode = getCode(mappedCodes.paper?.value)
-      const colorCode = getCode(mappedCodes.color)
-      const wvkCode = getCode(mappedCodes.wvkaschieren)
+      const paperCode   = getCode(mappedCodes.paper?.value)
+      const colorCode   = getCode(mappedCodes.color)
+      const wvkCode     = getCode(mappedCodes.wvkaschieren)
 
       const missing = []
       if (!productCode) missing.push('Produkt')
-      if (!paperCode) missing.push('Papier')
-      if (!colorCode) missing.push('Farbe')
-      if (!wvkCode) missing.push('Kaschierung')
+      if (!paperCode)   missing.push('Papier')
+      if (!colorCode)   missing.push('Farbe')
+      if (!wvkCode)     missing.push('Kaschierung')
       if (missing.length) {
-        error.value = `Fehlende Pflichtzuordnungen: ${missing.join(', ')}. Bitte EASY-Mapping / pims-map prüfen.`
         submitting.value = false
+        error.value = `Fehlende Pflichtzuordnungen: ${missing.join(', ')}. Bitte EASY-Mapping / pims-map prüfen.`
+        toast.error(error.value)
         return
       }
+
+      const qty = Math.ceil((Number(item.oxamount) || 0) * 1.1 + 25)
 
       const form = new FormData()
-      form.append('orderid', String(orderRes.orderid))
-      form.append('uniqueid', `${item.oxordernr}-${item.ddposition * 10}`)
-      form.append('product', productCode)
+      form.append('orderid',   String(orderRes.orderid))
+      form.append('uniqueid',  `${item.oxordernr}-${item.ddposition * 10}`)
+      form.append('product',   productCode)
       form.append('readytoprint', 'A')
-      form.append('paper', paperCode)
-      form.append('color', colorCode)
-      form.append('duration', 3)
-      form.append('quantity', String(Number((item.oxamount * 1.1) + 25)))
-      form.append('width', String(productForm.width ?? 0))
-      form.append('height', String(productForm.height ?? 0))
-      form.append('pages', String(pagesModel.value)) // nur 1 oder 2
-      form.append('comment', String(productForm.comment ?? '').trim())
+      form.append('paper',     paperCode)
+      form.append('color',     colorCode)
+      form.append('duration',  3)
+      form.append('quantity',  String(qty))
+      form.append('width',     String(productForm.width ?? 0))
+      form.append('height',    String(productForm.height ?? 0))
+      form.append('pages',     String(pagesModel.value))
+      form.append('comment',   String(productForm.comment ?? '').trim())
       form.append('identifier', `${item.oxordernr}-${item.ddposition * 10} - ${item.oxtitle}` ?? '')
       form.append('checkmail', 'info@easyordner.de')
-      form.append('neutral', 'N')
-      form.append('file_front', fileFront.value, fileFront.value.name)
-      if (fileBack.value) {
-        form.append('file_back', fileBack.value, fileBack.value.name)
-      }
+      form.append('neutral',   'N')
       form.append('wvkaschieren', wvkCode)
 
+      form.append('file_front', fileFront.value, fileFront.value.name)
+      if (fileBack.value) form.append('file_back', fileBack.value, fileBack.value.name)
+
+      // Debug: zeige an, was wirklich gesendet wird
+      for (const [k, v] of form.entries()) {
+        console.log('PIMS-PRODUCT FD', k, v instanceof File ? `File(${v.name})` : v)
+      }
+
+      // ---- PRODUCT anlegen
       productRes = await placePimsProductViaProxy(form)
+      console.log('PRODUCT RES:', productRes)
 
-      if (productRes.data?.errorlist?.error?.some(e => e.text === "AlreadyTransferred")) {
-        console.error("PIMS Product Fehler:", productRes.data)
-        toast.error("Produkt wurde bereits angelegt")
+      // Produktfehler
+      if (productRes?.errorlist?.error?.some(e => e.text === 'AlreadyTransferred')) {
+        submitting.value = false
+        console.error('PIMS Product Fehler:', productRes)
+        toast.error('Produkt wurde bereits angelegt')
+        return
+      }
+      if (handlePimsErrors(productRes)) {
+        submitting.value = false
+        console.error('PIMS Product Fehler:', productRes)
+        return
+      }
+      if (!productRes || !productRes.productid) {
+        submitting.value = false
+        error.value = 'PIMS Product konnte nicht angelegt werden (keine productid).'
+        toast.error(error.value)
         return
       }
 
-      if (handlePimsErrors(productRes.data)) {
-        console.error("PIMS Product Fehler:", productRes.data)
-        return
-      }
-
+      // ---- PARCEL anlegen
       await submitParcel(productRes, orderRes, item)
 
       lastOrderResponse.value = { order: orderRes, product: productRes, parcel: parcelRes }
     }
-
   } catch (err) {
     console.error('Fehler beim Absenden:', err)
     error.value =
@@ -587,6 +639,7 @@ async function submitOrder(item) {
       err?.response?.data?.message ||
       err?.message ||
       'Fehler beim Absenden der Bestellung.'
+    toast.error(String(error.value))
   } finally {
     submitting.value = false
   }
@@ -595,12 +648,14 @@ async function submitOrder(item) {
 function handlePimsErrors(response) {
   const errors = response?.errorlist?.error
   if (!Array.isArray(errors)) return false
-
+  let any = false
   errors.forEach(err => {
-    toast.error(`${err.field}: ${err.text}`)
+    any = true
+    const msg = `${err.field || '-'}: ${err.text || 'Fehler'}`
+    toast.error(msg)
+    try { error.value = msg } catch {}
   })
-
-  return true
+  return any
 }
 
 function getNextWeekday(weekday) {
@@ -631,7 +686,10 @@ console.log('formattedNextDay', formattedNextDay)
 async function submitParcel(productRes, orderRes, item) {
   const form = new FormData()
   form.append('productid', String(productRes?.productid ?? ''))
-  form.append('uniqueid', `${productRes?.orderid}-${productRes?.ddposition * 10}`)
+
+  // uniqueid korrekt aus Order + ausgewählter Position (nicht aus productRes)
+  form.append('uniqueid', `${orderRes?.ordernr ?? orderRes?.orderid}-${item.ddposition * 10}`)
+
   form.append('delivery', 'dhl')
   form.append('shipper_additional1', 'easyOrdner')
   form.append('shipper_additional2', 'info@easyordner.de')
@@ -645,30 +703,24 @@ async function submitParcel(productRes, orderRes, item) {
   form.append('phone', '05141753241')
   form.append('date', String(formattedNextDay))
 
-  if (fileFront.value) {
-    form.append('file_front', fileFront.value, fileFront.value.name)
-  }
-  if (fileBack.value) {
-    form.append('file_back', fileBack.value, fileBack.value.name)
-  }
+  if (fileFront.value) form.append('file_front', fileFront.value, fileFront.value.name)
+  if (fileBack.value)  form.append('file_back',  fileBack.value,  fileBack.value.name)
 
-  const options = {
-    method: 'POST',
-    url: '/api/proxy/pims-parcel',
-    headers: {
-      'Content-Type': 'multipart/form-data',
-      Accept: 'application/json'
-    },
-    data: form
+  // Debug Parcel-Felder
+  for (const [k, v] of form.entries()) {
+    console.log('PIMS-PARCEL FD', k, v instanceof File ? `File(${v.name})` : v)
   }
 
   try {
-    const { data } = await axios.request(options)
+    // Keine manuellen multipart-Header setzen -> Browser kümmert sich um Boundary
+    const { data } = await axios.post('/api/proxy/pims-parcel', form)
     console.log('Parcel Response:', data)
-    submitOrderToBackend(orderRes, productRes, item)
+    await submitOrderToBackend(orderRes, productRes, item)
     reloadPageWithToast('Druckauftrag angelegt')
   } catch (error) {
     console.error('Fehler beim Absenden des Parcel:', error)
+    toast.error('Parcel-Fehler: ' + (error?.response?.data?.error || error.message))
+    throw error
   }
 }
 
@@ -686,6 +738,7 @@ async function submitOrderToBackend(orderRes, productRes, item) {
     console.log('Bestellung erfolgreich gespeichert:', response.data)
   } catch (error) {
     console.error('Fehler beim Speichern der Bestellung:', error)
+    toast.error('Speicherfehler: ' + (error?.response?.data?.error || error.message))
   }
 }
 
@@ -713,7 +766,7 @@ async function cancelAllActiveProducts(orderid) {
       console.log('Produkt-Storno', productid, data)
     } catch (e) {
       console.error('Produkt-Storno Fehler:', e)
-      // optional: throw e; // wenn du bei Fehlern abbrechen willst
+      // optional: throw e;
     }
   }
 }
@@ -763,6 +816,7 @@ async function stornoOrder(item) {
     stornoSubmitting.value = false
   }
 }
+
 function openStornoConfirm(item) {
   stornoItem = item
   showStornoConfirm.value = true
@@ -771,7 +825,7 @@ function openStornoConfirm(item) {
 async function confirmStorno() {
   if (!stornoItem) return
   showStornoConfirm.value = false
-  await stornoOrder(stornoItem) // deine bestehende Funktion
+  await stornoOrder(stornoItem)
   stornoItem = null
 }
 
@@ -783,11 +837,11 @@ watch(selectedItem, async (val) => {
     alreadyOrdered.value = false
   }
 })
+
 function reloadPageWithToast(message, type = 'success') {
   sessionStorage.setItem('pendingToast', JSON.stringify({ message, type }))
   window.location.reload()
 }
-
 </script>
 
 <style scoped>

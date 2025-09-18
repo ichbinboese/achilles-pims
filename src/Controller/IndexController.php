@@ -38,6 +38,12 @@ class IndexController extends AbstractController
         return $this->render('base.html.twig');
     }
 
+    #[Route('/api/logout', name: 'app_logout', methods: ['POST'])]
+    public function logout(): void
+    {
+        throw new \LogicException('Intercepted by the firewall.');
+    }
+
     #[Route('/api/bestellung', name: 'api_bestellung', methods: ['GET'])]
     public function getBestellung(Request $request): JsonResponse
     {

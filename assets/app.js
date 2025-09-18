@@ -20,20 +20,33 @@ const auth = useAuthStore()
 auth.initializeToken()
 
 // Auth-Header bei vorhandenem Token setzen
-if (auth.token) {
-  axios.defaults.headers.common['Authorization'] = 'Bearer ' + auth.token
-}
+// Helper, um Ref oder String sicher zu lesen
+function tokenValue(maybeRef) {
+  return (maybeRef && typeof maybeRef === 'object' && 'value' in maybeRef)
+    ? maybeRef.value
+    : maybeRef
+  }
+const bootToken = tokenValue(auth.token)
+  if (bootToken) {
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + bootToken
+  }
 
 // Navigation Guard
-router.beforeEach((to, from, next) => {
-  const auth = useAuthStore()
-  const isAuthenticated = !!auth.token
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next('/')
-  } else {
-    next()
-  }
-})
+router.beforeEach(async (to, from, next) => {
+    const auth = useAuthStore()
+        const token = tokenValue(auth.token)
+
+        // Falls Token da ist, aber user noch nicht geladen → jetzt laden
+            if (token && !auth.user && typeof auth.fetchUser === 'function') {
+        try { await auth.fetchUser() } catch {}
+      }
+
+        // Zugriffsschutz
+            if (to.meta.requiresAuth && !token) return next('/')
+        // Bereits eingeloggt? Dann Loginseite meiden
+        if (to.path === '/' && token)   return next('/dashboard')
+        return next()
+      })
 
 app.use(router)
 

@@ -64,13 +64,9 @@
         </li>
       </ul>
 
-      <!-- Wenn Benutzer noch geladen wird, zeige den Lade-Indikator -->
-      <span v-else class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">Lade Benutzerdaten...</span>
-
       <!-- User + Logout + Darkmode -->
-      <div class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
-        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1" v-if="loadingLdap">Lade Benutzerdaten...</span>
-        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1" v-else>Angemeldet als {{ ldapFirstname }} {{ ldapLastname }}</span>
+      <div v-if="user" class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
+        <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">Angemeldet als {{ displayFirstname }} {{ displayLastname }}</span>
 
         <!-- Darkmode Toggle -->
         <button
@@ -94,22 +90,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import axios from "axios";
 
-// Reaktive Variablen
 const isOpen = ref(false)
 const isDark = ref(false)
-const ldapFirstname = ref('')
-const ldapLastname = ref('')
-const user = ref(null)
-const loadingLdap = ref(false)
+const ldapUser = ref(null)
+const loadingUser = ref(false)
 
-// Authentifizierungsstore verwenden
+const router = useRouter()
 const auth = useAuthStore()
 
-// Toggle Darkmode
+// Einzige "user"-Quelle: Store
+const user = computed(() => auth.user)
+const displayFirstname = computed(() => user.value?.firstname ?? '')
+const displayLastname  = computed(() => user.value?.lastname ?? '')
+
 function toggleDarkMode() {
   isDark.value = !isDark.value
   const root = document.documentElement
@@ -117,36 +115,35 @@ function toggleDarkMode() {
   localStorage.setItem('darkmode', isDark.value ? '1' : '0')
 }
 
-// Benutzer LDAP-Daten abrufen
-async function fetchLdap() {
-  loadingLdap.value = true
+async function ensureUserLoaded() {
+  if (user.value) return
+  loadingUser.value = true
   try {
-    const { data } = await axios.get('/api/ldap-user', { withCredentials: true })
-    if (data.status === 'ok') {
-      ldapFirstname.value = data.firstname
-      ldapLastname.value = data.lastname
-      // Hier speichern wir den Benutzer in der Variable
-      user.value = data // Speichern der Benutzerdaten direkt
+    if (auth.fetchUser) {
+      await auth.fetchUser() // befüllt auth.user aus /api/user
     }
-  } catch (error) {
-    console.warn('LDAP-User konnte nicht geladen werden')
-    console.error('Fehler beim Laden des LDAP-Benutzers:', error)
   } finally {
-    loadingLdap.value = false
+    loadingUser.value = false
   }
 }
 
-// Beim Mounten der Komponente den Benutzer laden
 onMounted(async () => {
   isDark.value = localStorage.getItem('darkmode') === '1'
   if (isDark.value) document.documentElement.classList.add('dark')
-
-  // LDAP-Daten abrufen
-  await fetchLdap()
+  await ensureUserLoaded()
 })
 
-// Logout-Funktion
-function handleLogout() {
-  auth.logout()
+// Wichtig: den Ref selbst beobachten, nicht eine Getter-Funktion
+watch(auth.token, async (t) => {
+  if (t) await ensureUserLoaded()
+})
+
+async function handleLogout() {
+  try {
+    // wichtig: REQUEST schicken, nicht router.push
+    await axios.post('/api/logout', null, { withCredentials: true })
+  } catch { /* 404/CSRF etc. ignorieren */ }
+  auth.logout()         // Token/Header clientseitig wegräumen
+  router.replace('/')   // zurück zur Login-Seite
 }
 </script>

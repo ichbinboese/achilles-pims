@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || null)
   const user  = ref(null)
+  const tokenString = computed(() => token.value || '')
+  const isAuthenticated = computed(() => !!token.value)
 
   // Stelle sicher, dass Axios den Token verwendet
   if (token.value) {
@@ -21,11 +22,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
-    const router = useRouter();
     token.value = null
     localStorage.removeItem('token')
     delete axios.defaults.headers.common['Authorization']
-    router.push('/')
   }
 
   function initializeToken() {
@@ -36,15 +35,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function fetchUser() {
-    // hol dir den angemeldeten User (muss im Symfony-Backend /api/user existieren)
-    const { data } = await axios.get('/api/user')
-    user.value = data
-  }
+async function fetchUser() {
+        const { data } = await axios.get('/api/ldap-user')     // liefert username  evtl. email
+        user.value = data
+}
 
   return {
     token,
     user,
+    tokenString,
+    isAuthenticated,
     login,
     logout,
     initializeToken,

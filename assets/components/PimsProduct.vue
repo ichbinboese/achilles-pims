@@ -414,79 +414,102 @@ const day = String(nextDay.getDate()).padStart(2, '0')
 const formattedNextDay = `${year}-${month}-${day}`
 console.log('formattedNextDay', formattedNextDay)
 
+function coerceJson(data) {
+  if (data && typeof data === 'object') return data
+  if (typeof data === 'string') {
+    // greift das letzte {...} bis zum Ende der Response
+    const m = data.match(/\{[\s\S]*\}\s*$/)
+    if (m) {
+      try { return JSON.parse(m[0]) } catch (_) {}
+    }
+    // Fallback: sehr grob – erkennt Erfolg im String
+    if (/"success"\s*:\s*1/.test(data) || /"parcelid"\s*:\s*\d+/.test(data)) {
+      return { success: 1, guessedFrom: 'string' }
+    }
+  }
+  return null
+}
 
 // FIX: Signatur anpassen + fehlerhafte fd.append Aufrufe korrigieren
+// FIX: Parcel-Aufruf – uniqueid mitgeben, Content-Type Header NICHT manuell setzen,
+// Mail/Checkmail validieren, ein paar Defaults härten.
 async function submitParcel(productId, mail) {
   try {
     const p = parcelState.value
     const fd = new FormData()
 
-    console.log('Parcel State:', p)
-    console.log('Mail (arg):', mail, 'valid:', emailRegex.test((mail || '').trim()))
-
-    // Pflicht: productid vom Produkt-Endpunkt
+    // Pflicht-IDs
     fd.append('productid', String(productId))
+    fd.append('uniqueid', `${route.params.bestnr}-${route.params.position}`)
 
     // Versanddaten
     fd.append('delivery', p.delivery || 'dhl')
-    fd.append('title', p.title || 'firma')
-    fd.append('name', p.name || 'Achilles Präsentationsprodukte GmbH')
-    fd.append('street', p.street || 'Bruchkampweg 40')
+    fd.append('title',    p.title    || 'firma')
+    fd.append('name',     p.name     || 'Achilles Präsentationsprodukte GmbH')
+    fd.append('street',   p.street   || 'Bruchkampweg 40')
     fd.append('postcode', p.postcode || '29227')
-    fd.append('locale', p.locale || 'Celle')
-    fd.append('country', p.country || 'Deutschland')
+    fd.append('locale',   p.locale   || 'Celle')
+    fd.append('country',  'deutschland')
 
-    // Kontakt – NUR wenn valide, und beides senden (mail + checkmail)
+    // Mail/Checkmail (beide) – nur wenn valide
     const safeMail = (mail || '').trim()
-    if (!emailRegex.test(safeMail)) {
-        toast.error(`Parcel: Ungültige E-Mail (${safeMail || 'leer'})`)
-        return
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeMail)
+    if (!emailOk) {
+      console.error('Parcel: ungültige E-Mail →', safeMail)
+      toast.error(`Parcel: Ungültige E-Mail (${safeMail || 'leer'})`)
+      return
     }
-
-    console.log('shipper_additional1 →', parcelState.value.shipper_additional1)
-
     fd.append('mail', safeMail)
     fd.append('checkmail', safeMail)
+
+    // Telefon (optional)
     const phone = (form.value.phone ?? p.phone ?? '').trim()
     if (phone) fd.append('phone', phone)
 
-    // Zusatzinfos (sauber zusammensetzen)
-    const additional1 =
-      (parcelState.value.shipper_additional1 || '').trim()
-      || [form.value.fname, form.value.lname].filter(Boolean).join(' ').trim()
-      || 'Druckbogeneingang'
-
+    // Zusatzinfos
+    const fullName   = [form.value.fname, form.value.lname].filter(Boolean).join(' ').trim()
+    const additional1 = (p.shipper_additional1 || fullName || 'Druckbogeneingang').trim()
     fd.append('shipper_additional1', additional1)
     fd.append('shipper_additional2', `${route.params.bestnr}-${route.params.position}`)
 
-    // Datum (Format vorher berechnet)
+    // Datum
     fd.append('date', formattedNextDay)
 
-    console.log('shipper_additional1 (final) →', additional1)
+    // Dateien (optional)
+    if (fileFront.value) fd.append('file_front', fileFront.value, fileFront.value.name)
+    if (fileBack.value)  fd.append('file_back',  fileBack.value,  fileBack.value.name)
 
-    const { data } = await axios.post('/api/proxy/pims-parcel', fd, {
-      headers: { 'Content-Type': 'multipart/form-data', Accept: 'application/json' },
-      withCredentials: true
-    })
+    const resp = await axios.post('/api/proxy/pims-parcel', fd, { withCredentials: true })
 
-    // Debug: Alle FormData-Keys anzeigen
+    // Debug (ohne Files)
     for (const [k, v] of fd.entries()) {
       if (k !== 'file_front' && k !== 'file_back') console.log('FD', k, '→', v)
     }
 
-    console.log('Parcel Response:', data)
+    // 🔧 Robust: JSON aus evtl. HTML+JSON-Antwort extrahieren
+    const data = coerceJson(resp?.data)
+    console.log('Parcel Response (coerced):', data)
 
-    if (data?.success !== 1) {
-      console.error('Parcel Error:', data);
-      // Falls Backend weiterhin "mail" bemängelt → Wert ausgeben
-      toast.error(data?.errorlist?.error?.[0]?.text === 'ObligatoryFieldNotFilledOrWrongFormat'
-        ? `Parcel: E-Mail ungültig oder leer (${safeMail || 'leer'})`
-        : 'Paket/Versand anlegen fehlgeschlagen');
-      return;
+    // Erfolg früh erkennen
+    const successVal = (typeof data?.success !== 'undefined') ? String(data.success) : ''
+    const isOk = successVal === '1' || successVal.toLowerCase?.() === 'true' || !!data?.parcelid
+    if (isOk) {
+      toast.success(`Parcel angelegt (ID: ${data?.parcelid ?? '—'})`)
+      return
     }
+
+    // Fehlerliste nur prüfen, wenn NICHT erfolgreich
+    if (data?.errorlist?.error) {
+      const list = Array.isArray(data.errorlist.error) ? data.errorlist.error : [data.errorlist.error]
+      list.filter(Boolean).forEach(e => toast.error(`${e?.field ?? 'parcel'}: ${e?.text ?? 'Fehler'}`))
+      return
+    }
+
+    // Fallback
+    toast.error('Paket/Versand anlegen fehlgeschlagen')
   } catch (error) {
-    console.error('Fehler beim Absenden des Parcel:', error);
-    toast.error('Fehler beim Absenden des Parcel');
+    console.error('Fehler beim Absenden des Parcel:', error)
+    toast.error('Fehler beim Absenden des Parcel')
   }
 }
 
