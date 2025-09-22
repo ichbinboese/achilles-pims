@@ -9,7 +9,9 @@ import NotFound from '../components/NotFound.vue'
 import EasyForm from '../components/EasyForm.vue'
 import EasyResult from '../components/EasyResult.vue'
 import EasyOrderOverview from '../components/EasyOrderOverview.vue'
+import EasyPrintOverview from '../components/EasyPrintOverview.vue'
 import APPOrderOverview from '../components/APPOrderOverview.vue'
+import PrintlistOverview from "../components/PrintlistOverview.vue";
 
 const routes = [
   { path: '/', component: LoginForm },
@@ -22,6 +24,8 @@ const routes = [
   { path: '/easy-result', name: 'easy-result', component: EasyResult, meta: { requiresAuth: true } },
   { path: '/easy-form', name: 'easy-form', component: EasyForm, meta: { requiresAuth: true } },
   { path: '/easy-orders', name: 'easy-orders', component: EasyOrderOverview, meta: { requiresAuth: true } },
+  { path: '/easy-printlist', name: 'easy-printlist', component: EasyPrintOverview, meta: { requiresAuth: true } },
+  { path: '/printlist-overview', name: 'printlist-overview', component: PrintlistOverview, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

@@ -60,7 +60,7 @@
           <input type="number" v-model="form.height" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required />
         </div>
         <div class="w-1/3">
-          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Auflage:</label>
+          <label class="block text-sm font-semibold text-stone-700 dark:text-stone-300 mb-1 ml-4">Anzahl Nutzen:</label>
           <input type="number" v-model="form.quantity" class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4" required/>
         </div>
       </div>

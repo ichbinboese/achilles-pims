@@ -302,6 +302,51 @@ SQL;
         return new JsonResponse($orders, 200);
     }
 
+    #[Route('/api/printorders', name: 'api_printorders', methods: ['GET'])]
+    public function listEasyPrintOrders(EntityManagerInterface $em): JsonResponse
+    {
+        // Hole Orders mit ihren Produkten, aber nur Produkte mit listprint = false
+        $ordersRaw = $em->getRepository(EasyOrder::class)
+            ->createQueryBuilder('o')
+            ->leftJoin('o.products', 'p', 'WITH', 'p.listprint = :flag')
+            ->addSelect('p')
+            ->setParameter('flag', false)
+            ->getQuery()
+            ->getResult();
+
+        $orders = [];
+        foreach ($ordersRaw as $orderEntity) {
+            $products = [];
+            foreach ($orderEntity->getProducts() ?? [] as $p) {
+                // Sicherheitshalber nochmal prüfen
+                if ($p->isListprint() === false) {
+                    $products[] = [
+                        'productId'  => $p->getProductId(),
+                        'productNr'  => $p->getProductNr(),
+                        'oxOrderNr'  => $p->getOxOrderNr(),
+                        'ddPosition' => $p->getDdPosition(),
+                        'amount'     => $p->getAmount(),
+                        'artnr'      => $p->getArtnr(),
+                        'listprint'  => $p->isListprint(),
+                    ];
+                }
+            }
+
+            // Nur Orders zurückgeben, die auch Produkte ohne listprint haben
+            if (!empty($products)) {
+                $orders[] = [
+                    'orderid'  => $orderEntity->getOrderId(),
+                    'ordernr'  => $orderEntity->getOrderNr(),
+                    'status'   => $orderEntity->getStatus(),
+                    'products' => $products,
+                ];
+            }
+        }
+
+        return new JsonResponse($orders, 200);
+    }
+
+
     #[Route('/api/user', name: 'api_current_user', methods: ['GET'])]
     public function current(?UserInterface $user): JsonResponse
     {

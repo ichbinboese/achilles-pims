@@ -28,6 +28,15 @@ class EasyProduct
     #[ORM\ManyToOne(targetEntity: EasyOrder::class, inversedBy: 'products')]
     private ?EasyOrder $order;
 
+    #[ORM\Column(type: 'boolean')]
+    private bool $listprint = false;
+
+    #[ORM\Column(type: 'integer')]
+    private int $amount = 0;
+
+    #[ORM\Column(length: 255)]
+    private ?string $artnr = null;
+
     // Getter und Setter
 
     public function getId(): ?int
@@ -87,6 +96,39 @@ class EasyProduct
     public function setOrder(?EasyOrder $order): self
     {
         $this->order = $order;
+        return $this;
+    }
+
+    public function isListprint(): bool
+    {
+        return $this->listprint;
+    }
+
+    public function setListprint(bool $listprint): self
+    {
+        $this->listprint = $listprint;
+        return $this;
+    }
+
+    public function getAmount(): int
+    {
+        return $this->amount;
+    }
+
+    public function setAmount(int $amount): self
+    {
+        $this->amount = $amount;
+        return $this;
+    }
+
+    public function getArtnr(): ?string
+    {
+        return $this->artnr;
+    }
+
+    public function setArtnr(?string $artnr): self
+    {
+        $this->artnr = $artnr;
         return $this;
     }
 }

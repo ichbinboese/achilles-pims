@@ -581,7 +581,7 @@ async function submitOrder(item) {
         return
       }
 
-      const qty = Math.ceil((Number(item.oxamount) || 0) * 1.1 + 25)
+      const qty = Math.ceil((((item.oxamount * 1.1) + 25) / 5) * 5)
 
       const form = new FormData()
       form.append('orderid',   String(orderRes.orderid))
@@ -732,21 +732,39 @@ async function submitParcel(productRes, orderRes, item) {
 
 async function submitOrderToBackend(orderRes, productRes, item) {
   try {
+    // Sicher casten
+    const oxamount = Number(item?.oxamount ?? 0);
+    const artnr    = (item?.oxartnum ?? '').toString().trim();
+
+    // Auf nächsten 5er Schritt runden
+    const amount = Math.ceil(((oxamount * 1.1) + 25) / 5) * 5;
+
+    console.log('selected item:', JSON.stringify(item, null, 2));
+
     const payload = {
-      orderid: orderRes.orderid,
-      ordernr: orderRes.ordernr,
-      productid: productRes.productid,
-      productnr: productRes.productnr,
-      oxordernr: item.oxordernr,
-      ddposition: item.ddposition,
-    }
-    const response = await axios.post('/api/save-order', payload)
-    console.log('Bestellung erfolgreich gespeichert:', response.data)
+      orderid:   Number(orderRes?.orderid ?? 0),
+      ordernr:   String(orderRes?.ordernr ?? ''),
+      productid: Number(productRes?.productid ?? 0),
+      productnr: String(productRes?.productnr ?? ''),
+      oxordernr: String(item?.oxordernr ?? ''),
+      ddposition: Number(item?.ddposition ?? 0),
+      amount,
+      artnr
+    };
+
+    // Debug: Verifiziere, dass wirklich alles drin ist
+    console.log('save-order payload:', JSON.stringify(payload, null, 2));
+
+    await axios.post('/api/save-order', payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    console.log('Bestellung erfolgreich gespeichert');
   } catch (error) {
-    console.error('Fehler beim Speichern der Bestellung:', error)
-    toast.error('Speicherfehler: ' + (error?.response?.data?.error || error.message))
+    console.error('Fehler beim Speichern der Bestellung:', error);
+    toast.error('Speicherfehler: ' + (error?.response?.data?.error || error.message));
   }
 }
+
 
 function isProductActive(prod) {
   const s = (prod?.status ?? '').toString().toLowerCase()

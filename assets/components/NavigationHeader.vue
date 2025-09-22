@@ -27,7 +27,7 @@
             to="/app-orders"
             class="nav-link-items"
           >
-            Bestellliste b7 - APP
+            APP - Bestellliste b7
           </router-link>
         </li>
         <li v-if="user.username !== 'biagri'">
@@ -35,7 +35,7 @@
             to="/search"
             class="nav-link-items"
           >
-            Bestellung aus b7 - APP
+            APP - Bestellung aus b7
           </router-link>
         </li>
         <li v-if="user.username === 'bboese' || user.username === 'biagri'">
@@ -43,7 +43,7 @@
             to="/easy-orders"
             class="nav-link-items"
           >
-            Bestellliste easyOrdner.de
+            easyOrdner - Bestelliste
           </router-link>
         </li>
         <li v-if="user.username === 'bboese' || user.username === 'biagri'">
@@ -51,7 +51,23 @@
             to="/easy-form"
             class="nav-link-items"
           >
-            Bestellung aus easyOrdner.de
+            easyOrdner - Bestellung
+          </router-link>
+        </li>
+        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
+          <router-link
+            to="/easy-printlist"
+            class="nav-link-items"
+          >
+            easyOrdner - Druckliste erstellen
+          </router-link>
+        </li>
+        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
+          <router-link
+            to="/printlist-overview"
+            class="nav-link-items"
+          >
+            easyOrdner - Übersicht Druckliste
           </router-link>
         </li>
         <li>

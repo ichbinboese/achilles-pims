@@ -291,38 +291,53 @@ class PimsOrderController extends AbstractController
     }
 
     #[Route('/api/save-order', name: 'save_order', methods: ['POST'])]
-    public function saveOrder(Request $request)
+    public function saveOrder(Request $request): JsonResponse
     {
-        // Hole die Daten aus der Anfrage
+        // Payload robust einlesen: JSON bevorzugt, sonst Form-Daten
         $data = json_decode($request->getContent(), true);
-        dump($data);
-
-        // Validierung der empfangenen Daten
-        if (!isset($data['orderid'], $data['ordernr'], $data['productid'], $data['productnr'], $data['oxordernr'], $data['ddposition'])) {
-            return new JsonResponse(['error' => 'Fehlende Daten'], 400);
+        if (!is_array($data)) {
+            $data = $request->request->all();
         }
 
+        $required = ['orderid','ordernr','productid','productnr','oxordernr','ddposition','amount','artnr'];
+        $missing  = array_values(array_diff($required, array_keys($data)));
+        if ($missing) {
+            return new JsonResponse(['error' => 'Fehlende Daten', 'missing' => $missing], 400);
+        }
 
-        // Speichern der Order in EasyOrder
+        // Werte normalisieren / casten
+        $orderId    = (int)$data['orderid'];
+        $orderNr    = (string)$data['ordernr'];
+        $productId  = (int)$data['productid'];
+        $productNr  = (string)$data['productnr'];
+        $oxOrderNr  = (string)$data['oxordernr'];
+        $ddPosition = (int)$data['ddposition'];
+        $amount     = (int)$data['amount'];
+        $artnr      = (string)$data['artnr'];
+
+        // EasyOrder speichern (optional: Duplikate vermeiden)
         $easyOrder = new EasyOrder();
-        $easyOrder->setOrderid($data['orderid']);
-        $easyOrder->setOrdernr($data['ordernr']);
+        $easyOrder->setOrderid($orderId);
+        $easyOrder->setOrdernr($orderNr);
         $this->entityManager->persist($easyOrder);
         $this->entityManager->flush();
 
-        // Speichern des Produkts in EasyProduct
+        // EasyProduct speichern
         $easyProduct = new EasyProduct();
-        $easyProduct->setProductid($data['productid']);
-        $easyProduct->setProductnr($data['productnr']);
-        $easyProduct->setOxordernr($data['oxordernr']);
-        $easyProduct->setDdposition($data['ddposition']);
-        $easyProduct->setOrder($easyOrder); // Verknüpft das Produkt mit der Bestellung
+        $easyProduct->setProductId($productId);
+        $easyProduct->setProductNr($productNr);
+        $easyProduct->setOxOrderNr($oxOrderNr);
+        $easyProduct->setDdPosition($ddPosition);
+        $easyProduct->setAmount($amount);
+        $easyProduct->setListprint(false);
+        $easyProduct->setArtnr($artnr);
+        $easyProduct->setOrder($easyOrder);
         $this->entityManager->persist($easyProduct);
         $this->entityManager->flush();
 
-        // Erfolgsantwort zurückgeben
         return new JsonResponse(['success' => true], 200);
     }
+
     /**
      * Proxy: Einzelner Order-Status
      * /api/proxy/pims-order-status?orderid=12345
