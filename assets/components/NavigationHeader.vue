@@ -109,25 +109,25 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
-import axios from "axios";
+import { storeToRefs } from 'pinia'
+import axios from 'axios'
 
 const isOpen = ref(false)
 const isDark = ref(false)
-const ldapUser = ref(null)
 const loadingUser = ref(false)
 
 const router = useRouter()
 const auth = useAuthStore()
 
-// Einzige "user"-Quelle: Store
-const user = computed(() => auth.user)
+// State/Getters als echte Refs aus dem Store ziehen
+const { token, user, isAuthenticated, tokenString } = storeToRefs(auth)
+
 const displayFirstname = computed(() => user.value?.firstname ?? '')
 const displayLastname  = computed(() => user.value?.lastname ?? '')
 
 function toggleDarkMode() {
   isDark.value = !isDark.value
-  const root = document.documentElement
-  root.classList.toggle('dark', isDark.value)
+  document.documentElement.classList.toggle('dark', isDark.value)
   localStorage.setItem('darkmode', isDark.value ? '1' : '0')
 }
 
@@ -135,8 +135,8 @@ async function ensureUserLoaded() {
   if (user.value) return
   loadingUser.value = true
   try {
-    if (auth.fetchUser) {
-      await auth.fetchUser() // befüllt auth.user aus /api/user
+    if (typeof auth.fetchUser === 'function') {
+      await auth.fetchUser() // befüllt auth.user aus /api/ldap-user
     }
   } finally {
     loadingUser.value = false
@@ -146,20 +146,30 @@ async function ensureUserLoaded() {
 onMounted(async () => {
   isDark.value = localStorage.getItem('darkmode') === '1'
   if (isDark.value) document.documentElement.classList.add('dark')
-  await ensureUserLoaded()
+
+  // Wenn bereits ein Token da ist, gleich den User laden
+  if (token.value) {
+    await ensureUserLoaded()
+  }
 })
 
-// Wichtig: den Ref selbst beobachten, nicht eine Getter-Funktion
-watch(auth.token, async (t) => {
-  if (t) await ensureUserLoaded()
+// WICHTIG: das Ref selbst beobachten (nicht den bereits entpackten Wert)
+watch(token, async (t, old) => {
+  if (t && !user.value) {
+    await ensureUserLoaded()
+  }
+  // Optional: wenn Token verschwindet → auf Login
+  if (!t && old) {
+    router.replace('/')
+  }
 })
 
 async function handleLogout() {
   try {
-    // wichtig: REQUEST schicken, nicht router.push
     await axios.post('/api/logout', null, { withCredentials: true })
-  } catch { /* 404/CSRF etc. ignorieren */ }
-  auth.logout()         // Token/Header clientseitig wegräumen
-  router.replace('/')   // zurück zur Login-Seite
+  } catch { /* ok – Server-Logout ist best effort */ }
+  auth.logout()
+  router.replace('/')
 }
 </script>
+
