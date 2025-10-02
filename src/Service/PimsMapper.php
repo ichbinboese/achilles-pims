@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Repository\DruckfarbenRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Main\PimsProdukt;
 use App\Entity\Main\PimsPapier;
@@ -14,6 +15,7 @@ final class PimsMapper
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PimsSkuParser $parser,
+        private readonly DruckfarbenRepository $druckfarbenRepo,
     ) {}
 
     /**
@@ -21,6 +23,8 @@ final class PimsMapper
      */
     public function resolveCodesForItem(string $oxartnum): array
     {
+        $match = $this->druckfarbenRepo->findOneBy(['achillesmapping' => $oxartnum]);
+
         $tokens = $this->parser->parse($oxartnum);
 
         // Indexe aufbauen (bei Bedarf später cachen)
@@ -41,7 +45,8 @@ final class PimsMapper
         $paper = $this->matchByTokens($paperIdx, $tokens, ['DIN','FUL','MEC','RAD']);
 
         // Produkt: via ORD (Wildcard, wenn ORD im SKU), sowie PRO/PRD/ART/REG/LBS
-        $product = $this->matchByTokens($prodIdx, $tokens, ['ORD','REG','LBS']);
+        $product = $this->matchByTokens($prodIdx, $tokens, ['ORD','REG','LBS','KLB','STS','SCB']);
+
 
         return [
             'product'      => $product,      // ['code'=>..., 'bezeichnung'=>...] oder null

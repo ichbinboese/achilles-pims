@@ -9,6 +9,7 @@ use App\Entity\Main\APPOrder;
 
 use App\Repository\APPOrderRepository;
 use App\Repository\APPProductRepository;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Ldap\Ldap;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -30,6 +31,11 @@ class IndexController extends AbstractController
     public function __construct(ManagerRegistry $registry)
     {
         $this->oracleManager = $registry->getManager('oracle');
+        return null;
+        return $this->json([
+            'ok' => false,
+            'message' => 'Unbekannter Fehler aufgetreten.'
+        ]);
     }
 
     #[Route('/', name: 'home')]
@@ -155,6 +161,268 @@ SQL;
         return $this->json(['status' => 'created', 'id' => $bestellung->getId()]);
     }
 
+    #[Route('/api/bestellung/parse', name: 'api_bestellung_parse', methods: ['GET'])]
+    public function parseBestellung(Request $request): JsonResponse
+    {
+        $fiNr   = (int)$request->query->get('fiNr');
+        $bestnr = $request->query->get('bestnr');
+
+        $daten = $this->findBestellungMitText($fiNr, $bestnr);
+        if (!$daten || empty($daten)) {
+            return $this->json(['ok' => false, 'error' => 'Keine Daten gefunden'], 404);
+        }
+
+        $client = HttpClient::create([
+            'headers' => [
+                'Authorization' => 'Bearer ' . ($_ENV['OPENAI_API_KEY'] ?? ''),
+                'Content-Type'  => 'application/json',
+            ],
+            'timeout' => 60,
+        ]);
+
+        $model = $_ENV['OPENAI_MODEL'] ?? 'gpt-4o-mini';
+
+        $objects = [];
+
+        foreach ($daten as $row) {
+            $txtlong = (string)($row['txtlong'] ?? '');
+            $pos     = (string)($row['bestpos'] ?? '');
+            $bnr     = (string)($row['bestnr'] ?? $bestnr ?? '');
+            if (trim($txtlong) === '') {
+                // leere Zeilen trotzdem als Objekt mit Minimalinfos ausgeben
+                $objects[] = [
+                    'name'              => null,
+                    'bestnr'            => $bnr,
+                    'bestpos'           => $pos,
+                    'papierklasse'      => null,
+                    'papiergrammatur'   => null,
+                    'objektformat'      => null,
+                    'bogenformat'       => null,
+                    'anzahl_nutzen'     => null,
+                    'druckbogen_vorderseite' => null,
+                    'vorlagen'          => null,
+                    'korrekturart'      => null,
+                    'versand'           => null,
+                    'druck'             => null,
+                    'format'            => null,
+                    'veredelung'        => null,
+                    'offenes_format'    => null,
+                    'graupappe'         => null,
+                    'mechanik'          => [
+                        'typ'       => null,
+                        'länge'     => null,
+                        'bügelzahl' => null,
+                        'füllhöhe'  => null,
+                        'position'  => null,
+                    ],
+                    '_error'            => 'Kein TXTLONG Text vorhanden',
+                ];
+                continue;
+            }
+
+            // "name" aus dem Text ableiten (Innen/Außen), fallback null
+            $name = $this->detectObjektName($txtlong);
+
+            // Prompt: ACHTUNG – wir wollen EIN OBJEKT zurück (kein Wrapper), Keys & Reihenfolge wie hier.
+            $prompt = <<<PROMPT
+Analysiere den folgenden deutschsprachigen Auftrags-Text und gib GENAU EIN JSON-Objekt zurück
+(kein Array, keine zusätzlichen Keys). Verwende GENAU die folgenden Felder in dieser Reihenfolge.
+"objektformat" ist das Feld für "Mappenformat","Registerformat", oder ähnliche Bezeichnungen mit "Format" außer "Bogenformat". 
+Zahlen bitte als Zahl (nicht als String) ausgeben, auch bei "objektformat" als Zahlen ausgeben, also nicht z.B. String "620 mm" sondern 620 als integer.
+falls erkennbar (z. B. anzahl_nutzen, bügelzahl).
+
+{
+  "name": "#{NAME}",
+  "bestnr": "#{BESTNR}",
+  "bestpos": "#{BESTPOS}",
+  "papierklasse": null,
+  "papiergrammatur": null,
+  "objektformat": {
+    "objektbreite": null,
+    "objekthoehe": null,
+  },
+  "bogenformat": {
+    "bogenbreite": null,
+    "bogenhoehe": null,
+  },
+  "anzahl_nutzen": null,
+  "druckbogen": null,
+  "vorlagen": null,
+  "korrekturart": null,
+  "versand": null,
+  "druck": null,
+  "format": null,
+  "veredelung": null,
+  "offenes_format": null,
+  "pappe": {
+    "typ": null,
+    "staerke": null,
+  },
+  "mechanik": {
+    "typ": null,
+    "länge": null,
+    "bügelzahl": null,
+    "füllhöhe": null,
+    "position": null
+  }
+}
+
+WICHTIG:
+- Trage die Platzhalter name/bestnr/bestpos exakt wie vorgegeben ein.
+- Mappe "Mappenformat" aus dem Text nach "objektformat".
+- Fehlt ein Wert, bleibt er null.
+- Gib ausschließlich ein einziges JSON-Objekt zurück, keine Erklärungen.
+
+TEXT:
+{$txtlong}
+PROMPT;
+
+            $prompt = str_replace(
+                ['#{NAME}', '#{BESTNR}', '#{BESTPOS}'],
+                [$name ?? '', $bnr, $pos],
+                $prompt
+            );
+
+            $body = [
+                'model' => $model,
+                'input' => [
+                    ['role' => 'system', 'content' => 'Du bist ein präziser Parser und gibst nur JSON aus.'],
+                    ['role' => 'user',   'content' => $prompt],
+                ],
+                // JSON-Mode der Responses API
+                'text' => [
+                    'format' => ['type' => 'json_object'],
+                ],
+                'temperature' => 0,
+            ];
+
+            try {
+                $resp = $client->request('POST', 'https://api.openai.com/v1/responses', [
+                    'body' => json_encode($body, JSON_UNESCAPED_UNICODE),
+                ]);
+                $data = $resp->toArray(false);
+
+                // bevorzugtes Feld
+                $json = $data['output_text'] ?? '';
+
+                // Fallback: output[..].content[..].text
+                if ($json === '' && !empty($data['output'])) {
+                    foreach ($data['output'] as $item) {
+                        if (!empty($item['content']) && is_array($item['content'])) {
+                            foreach ($item['content'] as $c) {
+                                if (!empty($c['text']) && is_string($c['text'])) {
+                                    $json = $c['text'];
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Code-Fences abstreifen
+                $json = preg_replace('/^```(?:json)?|```$/m', '', (string)$json);
+                $obj  = json_decode(trim($json), true);
+
+                // Falls AI die drei Meta-Felder nicht gesetzt hat, sicherstellen:
+                if (!is_array($obj)) { $obj = []; }
+                $obj['name']    = $obj['name']    ?? $name;
+                $obj['bestnr']  = $obj['bestnr']  ?? $bnr;
+                $obj['bestpos'] = $obj['bestpos'] ?? $pos;
+
+                $objects[] = $obj;
+            } catch (\Throwable $e) {
+                $objects[] = [
+                    'name'              => $name,
+                    'bestnr'            => $bnr,
+                    'bestpos'           => $pos,
+                    'papierklasse'      => null,
+                    'papiergrammatur'   => null,
+                    'objektformat'      => null,
+                    'objektbreite'      => null,
+                    'objekthoehe'       => null,
+                    'bogenformat'       => null,
+                    'bogenbreite'       => null,
+                    'bogenhoehe'        => null,
+                    'anzahl_nutzen'     => null,
+                    'druckbogen_vorderseite' => null,
+                    'vorlagen'          => null,
+                    'korrekturart'      => null,
+                    'versand'           => null,
+                    'druck'             => null,
+                    'format'            => null,
+                    'veredelung'        => null,
+                    'offenes_format'    => null,
+                    'pappe'         => null,
+                    'mechanik'          => [
+                        'typ'       => null,
+                        'länge'     => null,
+                        'bügelzahl' => null,
+                        'füllhöhe'  => null,
+                        'position'  => null,
+                    ],
+                    '_error'            => $e->getMessage(),
+                ];
+            }
+        }
+
+        $response = new JsonResponse(['objekt' => $objects]);
+        $response->setEncodingOptions(JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $response;
+
+    }
+
+    /**
+     * Leitet "Bezug außen/innen" aus dem Freitext ab.
+     */
+    private function detectObjektName(string $txt): ?string
+    {
+        $t = mb_strtolower($txt, 'UTF-8');
+
+        // Außen / Aussen
+        if (preg_match('/\bau(?:ß|ss)en(?:bezüge)?\b/u', $t)) {
+            return 'Bezug außen';
+        }
+        // Innen
+        if (preg_match('/\binnen(?:bezüge)?\b/u', $t)) {
+            return 'Bezug innen';
+        }
+        return null;
+    }
+
+
+    /**
+     * Zieht robust den Assistant-Text aus verschiedenen Responses-Formaten.
+     * Responses API bevorzugt `output_text`, kann aber auch strukturierte `output` liefern.
+     */
+    private function extractOutputText(array $data): string
+    {
+        // 1) Neues Feld der Responses-API
+        if (!empty($data['output_text']) && is_string($data['output_text'])) {
+            return $data['output_text'];
+        }
+        // 2) Fallback: Items in 'output' durchsuchen
+        if (!empty($data['output']) && is_array($data['output'])) {
+            foreach ($data['output'] as $item) {
+                if (!empty($item['content']) && is_array($item['content'])) {
+                    foreach ($item['content'] as $c) {
+                        // Manche SDKs nennen es 'output_text', andere schlicht 'text'
+                        if (isset($c['text']) && is_string($c['text'])) {
+                            return $c['text'];
+                        }
+                        if (isset($c['output_text']) && is_string($c['output_text'])) {
+                            return $c['output_text'];
+                        }
+                    }
+                }
+            }
+        }
+        // 3) Ultimativer Fallback, falls jemand aus Versehen Chat Completions nutzt/proxyed
+        if (!empty($data['choices'][0]['message']['content'])) {
+            return (string)$data['choices'][0]['message']['content'];
+        }
+        return '{}';
+    }
+
 
     #[Route('/api/easy-search', name: 'api_easy_search', methods: ['GET'])]
     public function easySearch(Request $request, ManagerRegistry $doctrine): JsonResponse
@@ -266,7 +534,8 @@ SQL;
         $qb = $em->createQueryBuilder()
             ->select('o', 'p')
             ->from(EasyOrder::class, 'o')
-            ->leftJoin(EasyProduct::class, 'p', 'WITH', 'p.order = o');
+            ->leftJoin(EasyProduct::class, 'p', 'WITH', 'p.order = o')
+            ->orderBy('o.orderNr', 'DESC');
 
         // als Arrays (statt Entities) zurück
         // Ergebnis ist eine verschachtelte Struktur je nach Hydration.
@@ -277,6 +546,7 @@ SQL;
         $ordersRaw = $em->getRepository(EasyOrder::class)->createQueryBuilder('o')
             ->leftJoin('o.products', 'p')
             ->addSelect('p')
+            ->orderBy('p.oxOrderNr', 'DESC')
             ->getQuery()
             ->getResult(); // Entities
 

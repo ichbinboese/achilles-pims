@@ -25,6 +25,29 @@
       </div>
     </div>
 
+    <!-- Swedex Modal -->
+    <div v-if="showSwedexConfirm" class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
+      <div class="bg-white dark:bg-stone-800 rounded-xl p-6 max-w-md w-full shadow-xl">
+        <h3 class="text-lg font-semibold mb-4 dark:text-white">
+          Möchten Sie die Bestellung wirklich an Swedex senden?
+        </h3>
+
+        <!-- NEU: Preis-Eingabe -->
+        <label class="block text-sm mb-1 dark:text-stone-200">Preis je Einheit (EUR)</label>
+        <input
+          v-model.number="swedexUnitPrice"
+          type="number" min="0" step="0.01"
+          class="w-full mb-4 p-2 border rounded dark:bg-stone-700 dark:text-white"
+          placeholder="z. B. 7,74"
+        />
+
+        <div class="flex gap-2 justify-end">
+          <button class="px-3 py-2 rounded bg-stone-200 dark:bg-stone-700" @click="showSwedexConfirm = false">Abbrechen</button>
+          <button class="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white" @click="sendSwedexOrder">Ja, senden</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Storno Modal -->
     <div
       v-if="showStornoConfirm"
@@ -143,7 +166,13 @@
                 @click="submitOrder(selectedItem)"
                 class="px-3 py-2 rounded bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
               >
-                {{ submitting ? 'Sendet…' : 'Bestellung absenden' }}
+                {{ submitting ? 'Sendet…' : 'Bestellung an Pinguin absenden' }}
+              </button>
+              <button
+                class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+                @click="showSwedexConfirm = true"
+              >
+                Bestellung an Swedex senden
               </button>
             </div>
           </div>
@@ -158,7 +187,7 @@
               <span class="font-semibold">Papier:</span>
               <code>{{ mappedCodes.paper?.label || mappedCodes.paper?.value || '135g Bilderdruck matt' }}</code>
             </div>
-            <div><span class="font-semibold">Farbe:</span> <code>{{ mappedCodes.color?.bezeichnung || mappedCodes.color?.code || mappedCodes.color || '—' }}</code></div>
+            <div><span class="font-semibold">Farbe:</span> <code>{{ mappedCodes.color?.label || '—' }}</code></div>
             <div><span class="font-semibold">Folie:</span> <code>{{ mappedCodes.wvkaschieren?.bezeichnung || mappedCodes.wvkaschieren?.code || mappedCodes.wvkaschieren || '—' }}</code></div>
           </div>
 
@@ -293,11 +322,13 @@ const fileBackInput = ref(null)
 const frontDragOver = ref(false)
 const backDragOver = ref(false)
 const mappingError = ref('')
+const showSwedexConfirm = ref(false)
 
 const widthTouched = ref(false)
 const heightTouched = ref(false)
 const alreadyOrdered = ref(false)
 const showStornoConfirm = ref(false)
+const swedexUnitPrice = ref(null)
 let stornoItem = null
 
 function markTouched(field) {
@@ -414,11 +445,15 @@ async function fetchMappings(oxartnum) {
     mappedCodes.paper = (oxartnum.startsWith('REG-'))
       ? { value: 'pd5624', label: '300g Bilderdruck matt' }
       : { value: 'pd5618', label: '135g Bilderdruck matt' }
-    mappedCodes.color = c.color ?? null
+    mappedCodes.color = c.color
+      ? { value: c.color.code, label: c.color.bezeichnung }
+      : { value: 'pd311', label: '4/4-farbig Euroskala' }
     mappedCodes.register = (oxartnum.startsWith('REG-'))
       ? { value: 'heftung_lose', label: 'wvheftung' }
       : { value: null, label: null }
     mappedCodes.wvkaschieren = c.wvkaschieren ?? null
+
+    console.log('mappedCodes:', mappedCodes)
 
     if (!getCode(mappedCodes.product) && !getCode(mappedCodes.paper) && !getCode(mappedCodes.color) && !getCode(mappedCodes.wvkaschieren)) {
       mappingError.value = 'Kein Mapping gefunden. Prüfe EASY-Mapping & SKU.'
@@ -861,6 +896,53 @@ watch(selectedItem, async (val) => {
     alreadyOrdered.value = false
   }
 })
+
+async function sendSwedexOrder() {
+  try {
+    showSwedexConfirm.value = false
+
+    if (!selectedItem.value) {
+      toast.error('Bitte zuerst eine Position wählen.')
+      return
+    }
+    if (!(fileFront.value instanceof File)) {
+      toast.error('Bitte zuerst die Druckdatei Vorderseite hochladen.')
+      return
+    }
+    const price = parseFloat(String(swedexUnitPrice.value ?? '').replace(',', '.'))
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error('Bitte einen gültigen Stückpreis eingeben.')
+      return
+    }
+
+    const s = selectedItem.value
+    const orderSwedexPayload = {
+      oxordnernr: s.oxordernr || '',   // -> order.bestnr
+      oxtitle: s.oxtitle || '',        // -> pos.beschreibung
+      oxamount: Number(s.oxamount ?? 0), // -> pos.menge
+      artnum: s.oxartnum || '',        // -> Lookup für pos.format
+      oxshortdesc: s.oxshortdesc,
+      preis: price                     // -> pos.preis
+    }
+
+    const fd = new FormData()
+    fd.append('order', JSON.stringify(orderSwedexPayload))
+    fd.append('filefront', fileFront.value)                 // << richtig
+    if (fileBack.value instanceof File) fd.append('fileback', fileBack.value) // << richtig
+
+    // Debug: prüfen, ob Keys wirklich so heißen
+    for (const [k, v] of fd.entries()) {
+      console.log('SWX FD', k, v instanceof File ? `File(${v.name})` : v)
+    }
+
+    await axios.post('/api/swedex/order/send', fd) // <-- KEIN Header setzen
+    toast.success('Bestellung an Swedex wurde per E-Mail versendet.')
+  } catch (err) {
+    console.error(err)
+    toast.error(err?.response?.data?.message || 'Senden fehlgeschlagen.')
+  }
+}
+
 
 function reloadPageWithToast(message, type = 'success') {
   sessionStorage.setItem('pendingToast', JSON.stringify({ message, type }))

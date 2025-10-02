@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="de">
+<body style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;">
+<p>Hallo,</p>
+<p>anbei eine neue Bestellung.</p>
+<table cellpadding="6" cellspacing="0" border="0" style="border-collapse: collapse;">
+  <tr><td><strong>Bestellnummer</strong></td><td>{{ order.bestnr ?? '-' }}</td></tr>
+  <tr><td><strong>Liefertermin</strong></td><td>{{ order.datum is defined ? (order.datum|date('d.m.Y')) : '-' }}</td></tr>
+  <tr><td><strong>Bestellwert</strong></td><td>{{ order.summe is defined ? ('Euro ' ~ (order.summe|number_format(2, ',', '.'))) : '-' }}</td></tr>
+</table>
+<p>Die PDF-Bestellung liegt als Anhang bei, ebenso die Druckdaten.</p>
+<p>Viele Grüße<br/>easyOrdner Team</p>
+</body>
+</html>

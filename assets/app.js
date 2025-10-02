@@ -16,48 +16,47 @@ app.use(pinia)
 
 import { useAuthStore } from './stores/auth.js'
 
-const auth = useAuthStore()
-auth.initializeToken()
-
-// Auth-Header bei vorhandenem Token setzen
-// Helper, um Ref oder String sicher zu lesen
 function tokenValue(maybeRef) {
   return (maybeRef && typeof maybeRef === 'object' && 'value' in maybeRef)
-    ? maybeRef.value
-    : maybeRef
-  }
-const bootToken = tokenValue(auth.token)
+      ? maybeRef.value
+      : maybeRef
+}
+
+// ⚠️ WICHTIG: Keine Top-Level-awaits! Alles in eine async-IIFE packen:
+;(async () => {
+  const auth = useAuthStore()
+  auth.initializeToken()
+
+  const bootToken = tokenValue(auth.token)
   if (bootToken) {
     axios.defaults.headers.common['Authorization'] = 'Bearer ' + bootToken
+    try { await auth.fetchUser() } catch { auth.logout() }
   }
 
-// Navigation Guard
-router.beforeEach(async (to, from, next) => {
+  // Router + Guards wie gehabt
+  router.beforeEach(async (to, from, next) => {
     const auth = useAuthStore()
-        const token = tokenValue(auth.token)
+    const token = tokenValue(auth.token)
+    if (token && !auth.user && typeof auth.fetchUser === 'function') {
+      try { await auth.fetchUser() } catch {}
+    }
+    if (to.meta.requiresAuth && !token) return next('/')
+    if (to.path === '/' && token)      return next('/dashboard')
+    return next()
+  })
 
-        // Falls Token da ist, aber user noch nicht geladen → jetzt laden
-            if (token && !auth.user && typeof auth.fetchUser === 'function') {
-        try { await auth.fetchUser() } catch {}
-      }
+  app.use(router)
+  app.use(Toast, {
+    position: 'top-center',
+    timeout: 5000,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    showCloseButtonOnHover: false,
+    hideProgressBar: false,
+    containerClassName: 'toast-container-custom'
+  })
 
-        // Zugriffsschutz
-            if (to.meta.requiresAuth && !token) return next('/')
-        // Bereits eingeloggt? Dann Loginseite meiden
-        if (to.path === '/' && token)   return next('/dashboard')
-        return next()
-      })
-
-app.use(router)
-
-app.use(Toast, {
-  position: 'top-center',
-  timeout: 5000,
-  closeOnClick: true,
-  pauseOnHover: true,
-  draggable: true,
-  showCloseButtonOnHover: false,
-  hideProgressBar: false,
-  containerClassName: 'toast-container-custom'
-})
-app.mount('#app')
+  await router.isReady()
+  app.mount('#app')
+})()

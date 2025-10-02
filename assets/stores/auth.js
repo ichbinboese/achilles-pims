@@ -6,19 +6,19 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || null)
   const user  = ref(null)
   const tokenString = computed(() => token.value || '')
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
 
   // Stelle sicher, dass Axios den Token verwendet
   if (token.value) {
     axios.defaults.headers.common['Authorization'] = 'Bearer ' + token.value
   }
 
-  function login(email, password) {
-    return axios.post('/api/login', { email, password }).then(response => {
-      token.value = response.data.token ?? 'demo'
-      localStorage.setItem('token', token.value)
-      axios.defaults.headers.common['Authorization'] = 'Bearer ' + token.value
-    })
+  async function login(email, password) {
+    const response = await axios.post('/api/login', { email, password })
+    token.value = response.data.token
+    localStorage.setItem('token', token.value)
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + token.value
+    await fetchUser()
   }
 
   function logout() {

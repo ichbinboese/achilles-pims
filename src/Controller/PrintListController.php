@@ -109,8 +109,14 @@ class PrintListController extends AbstractController
             $folie = '—';
             $upper = strtoupper($artnr);
             if (str_contains($upper, 'VEA10'))      $folie = 'Glanz';
+            elseif (str_contains($upper, 'VEA11')) $folie = 'Polylein Glanz';
+            elseif (str_contains($upper, 'VEA12')) $folie = 'Glanz (nachhaltig)';
             elseif (str_contains($upper, 'VEA20')) $folie = 'Matt';
-            elseif (str_contains($upper, 'VEA30')) $folie = 'X-Treme';
+            elseif (str_contains($upper, 'VEA21')) $folie = 'Polylein Matt';
+            elseif (str_contains($upper, 'VEA30')) $folie = 'X-Treme Matt';
+            elseif (str_contains($upper, 'VEA31')) $folie = 'X-Treme Glanz';
+            elseif (str_contains($upper, 'VEA40')) $folie = 'X-Touch';
+
 
             // Bogenformat fix
             $bogen = '700 × 500 mm';

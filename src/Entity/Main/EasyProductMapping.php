@@ -25,6 +25,15 @@ class EasyProductMapping
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
+    #[ORM\Column(length: 255)]
+    private ?string $format = null;
+
+    #[ORM\Column(length: 255)]
+    private ?string $halter = null;
+
+    #[ORM\Column(length: 255)]
+    private ?string $pappenstaerke = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -75,6 +84,38 @@ class EasyProductMapping
     {
         $this->name = $name;
 
+        return $this;
+    }
+    public function getFormat(): ?string
+    {
+        return $this->format;
+    }
+
+    public function setFormat(string $format): static
+    {
+        $this->format = $format;
+        return $this;
+    }
+
+    public function getHalter(): ?string
+    {
+        return $this->halter;
+    }
+
+    public function setHalter(string $halter): static
+    {
+        $this->halter = $halter;
+        return $this;
+    }
+
+    public function getPappenstaerke(): ?string
+    {
+        return $this->pappenstaerke;
+    }
+
+    public function setPappenstaerke(string $pappenstaerke): static
+    {
+        $this->pappenstaerke = $pappenstaerke;
         return $this;
     }
 }

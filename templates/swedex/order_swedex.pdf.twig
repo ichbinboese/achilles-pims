@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8"/>
+    <style>
+        /* Dompdf: system fonts, DejaVu Sans deckt Umlaute/€ ab */
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; }
+        .wrap { width: 100%; }
+        .grid { display: table; width: 100%; }
+        .col { display: table-cell; vertical-align: top; }
+        .right { text-align: right; }
+        .muted { color: #666; font-size: 11px; }
+        h1, h2, h3 { margin: 0; padding: 0; }
+        h1 { font-size: 22px; text-align: center; margin: 18px 0 10px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+        .box { border: 1px solid #ddd; padding: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
+        th { background: #f6f6f6; text-align: left; }
+        .w-10 { width: 10%; } .w-15 { width: 15%; } .w-20 { width: 20%; } .w-25 { width: 25%; } .w-30 { width: 30%; }
+        .totals { margin-top: 16px; }
+        .signature { margin-top: 28px; }
+    </style>
+</head>
+<body>
+{# KOPF: Absender / Empfänger #}
+<div class="grid mb-6">
+    <div class="col" style="width:55%;">
+        <div><strong>Achilles Präsentationsprodukte GmbH</strong></div>
+        <div>Bruchkampweg 40</div>
+        <div>29227 Celle</div>
+    </div>
+    <div class="col right" style="width:45%;">
+        {% set emp = order.empfaenger ?? {
+            'firma':'Impressic Manufacturing Kft.',
+            'strasse':'Alba Ipari Zóna, Zsurló 6',
+            'plzort':'8000 Székesfehérvár'
+        } %}
+        <div><strong>{{ emp.firma }}</strong></div>
+        {% if emp.strasse %}<div>{{ emp.strasse }}</div>{% endif %}
+        {% if emp.plzort  %}<div>{{ emp.plzort }}</div>{% endif %}
+    </div>
+</div>
+
+<h1>Bestellung</h1>
+
+{# Meta-Daten (Nr., Lief-Nr., Datum, Seite) #}
+<div class="grid mb-4">
+    <div class="col">
+        <div><strong>Nr.</strong> {{ order.bestnr ?? '-' }}</div>
+        <div><strong>Datum</strong> {{ (now)|date('d.m.Y') }}</div>
+    </div>
+    <div class="col right">
+        <div><strong>Seite</strong> 1 / 1</div>
+    </div>
+</div>
+
+{# Ansprechpartner-Block #}
+<div class="grid mb-6">
+    <div class="col" style="width:50%;">
+        <div class="mb-2"><strong>Ihr Zeichen:</strong></div>
+        <div>Herr Carl</div>
+        <div>+36 22/554-532</div>
+    </div>
+    <div class="col" style="width:50%;">
+        <div class="mb-2"><strong>Unser Zeichen</strong></div>
+        <div>Bianka Gries</div>
+        <div>05141/753-241</div>
+    </div>
+</div>
+
+{# Positions-Tabelle #}
+<table class="mb-6">
+    <thead>
+    <tr>
+        <th class="w-12">Termin</th>
+        <th class="w-8">Pos</th>
+        <th>Artikelbeschreibung</th>
+        <th class="w-12">Menge</th>
+        <th class="w-8">ME</th>
+        <th class="w-10">Preis</th>
+    </tr>
+    </thead>
+    <tbody>
+    {# Eine Position analog Muster: Pos 10 #}
+    {% set pos = (order.positionen is defined and order.positionen|length) ? order.positionen[0] : {} %}
+    <tr>
+        <td>{{ order.datum is defined ? (order.datum|date('d.m.Y')) : '' }}</td>
+        <td>{{ pos.pos }}</td>
+        <td>
+            {{ pos.beschreibung ?? '' }}<br/>
+            {{ pos.format ?? '' }}
+        </td>
+        <td>{{ pos.menge ?? '' }}</td>
+        <td>{{ pos.me ?? 'STK' }}</td>
+        <td>{{ ((pos.preis|default(0) + 0)|number_format(2, ',', '.')) }}</td>
+    </tr>
+    </tbody>
+</table>
+
+{# Produktbeschreibung / Technik #}
+<h3 class="mb-2">Produktbeschreibung</h3>
+<div class="box mb-6">
+    <div><strong>{{ order.produkt.bezeichnung ?? '-' }}</strong></div>
+    <div>
+        <strong>Veredelung:</strong> {{ order.produkt.veredelung ?? '-' }}<br/>
+        <strong>Niederhalter:</strong> {{ order.produkt.halter ?? '-' }}<br/>
+        <strong>Pappenstärke:</strong> {{ order.produkt.pappenstaerke ?? '-' }}<br/>
+        <strong>Druck:</strong> {{ order.produkt.druck ?? '-' }}<br/>
+        <strong>Lieferanschrift:</strong>folgt inkl. Lieferschein nach Fertigstellung<br/>
+        {% set shortdesc = order.produkt.shortdesc|default('') %}
+        {% if shortdesc %}
+            <strong>Beschreibung:</strong><br/>
+            {{ shortdesc|e|nl2br }}<br/>
+        {% endif %}
+    </div>
+</div>
+
+{# Bedingungen #}
+<div class="grid mb-6">
+    <div class="col" style="width:50%;">
+        <div><strong>Zahlungsbedingung:</strong></div>
+        <div>{{ order.zahlungsbedingung ?? '14 Tage 3% Skonto, 30 Tage netto' }}</div>
+    </div>
+    <div class="col" style="width:50%;">
+        <div><strong>Versandart:</strong></div>
+        <div>per Spedition oder Paketdienst, streng neutral (ohne Hinweis auf Impressic)</div>
+        <div><strong>Lieferbedingung:</strong></div>
+        <div>frei Haus an eine Anschrift</div>
+    </div>
+</div>
+
+{# Summe #}
+<div class="totals right">
+    {% set summe = order.summe ?? ((pos.preis|default(0) + 0) * (pos.menge|default(0) + 0)) %}
+    <strong>Bestellwert:</strong>
+    <strong>Euro {{ (summe|default(0) + 0)|number_format(2, ',', '.') }}</strong>
+</div>
+
+<div class="signature">
+    <div>Mit freundlichen Grüßen</div>
+    <div>easyOrdner Team</div>
+</div>
+</body>
+</html>
