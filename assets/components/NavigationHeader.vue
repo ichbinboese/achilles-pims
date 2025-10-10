@@ -21,67 +21,74 @@
     <!-- Menu -->
     <div :class="['w-full lg:flex lg:items-center lg:w-auto', isOpen ? 'block' : 'hidden']">
       <!-- Wenn Benutzer geladen ist, zeigen wir die Links -->
-      <ul v-if="user" class="lg:flex lg:space-x-2 mt-4 lg:space-y-0 space-y-4 lg:mt-0">
-        <li v-if="user.username !== 'biagrie'">
-          <router-link
-            to="/app-orders"
-            class="nav-link-items"
-          >
-            APP - Bestellliste b7
-          </router-link>
-        </li>
-        <li v-if="user.username !== 'biagri'">
-          <router-link
-            to="/search"
-            class="nav-link-items"
-          >
-            APP - Bestellung aus b7
-          </router-link>
-        </li>
-        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
-          <router-link
-            to="/easy-orders"
-            class="nav-link-items"
-          >
-            easyOrdner - Bestelliste
-          </router-link>
-        </li>
-        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
-          <router-link
-            to="/easy-form"
-            class="nav-link-items"
-          >
-            easyOrdner - Bestellung
-          </router-link>
-        </li>
-        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
-          <router-link
-            to="/easy-printlist"
-            class="nav-link-items"
-          >
-            easyOrdner - Druckliste erstellen
-          </router-link>
-        </li>
-        <li v-if="user.username === 'bboese' || user.username === 'biagri'">
-          <router-link
-            to="/printlist-overview"
-            class="nav-link-items"
-          >
-            easyOrdner - Übersicht Druckliste
-          </router-link>
-        </li>
-        <li>
-          <router-link
-            to="/dashboard"
-            class="nav-link-items"
-          >
-            Dashboard
-          </router-link>
-        </li>
-      </ul>
-
+      <div class="row">
+        <div class="col mb-5">
+          <ul v-if="user && user.username !== 'biagri'" class="lg:flex lg:space-x-2 mt-4 lg:space-y-0 space-y-4 lg:mt-0">
+            <li>
+              <router-link
+                to="/app-orders"
+                class="nav-link-items"
+              >
+                APP - Bestellliste b7
+              </router-link>
+            </li>
+            <li>
+              <router-link
+                to="/search"
+                class="nav-link-items"
+              >
+                APP - Bestellung aus b7
+              </router-link>
+            </li>
+          </ul>
+          </div>
+          <div class="col">
+          <ul v-if="user && (user.username === 'bboese' || user.username === 'biagri')" class="lg:flex lg:space-x-2 mt-3 lg:space-y-0 space-y-4 lg:mt-0">
+            <li>
+              <router-link
+                to="/easy-orders"
+                class="nav-link-items-blue"
+              >
+                easyOrdner - Bestelliste
+              </router-link>
+            </li>
+            <li v-if="user.username === 'bboese' || user.username === 'biagri'">
+              <router-link
+                to="/easy-form"
+                class="nav-link-items-blue"
+              >
+                easyOrdner - Bestellung
+              </router-link>
+            </li>
+            <li v-if="user.username === 'bboese' || user.username === 'biagri'">
+              <router-link
+                to="/easy-printlist"
+                class="nav-link-items-blue"
+              >
+                easyOrdner - Druckliste erstellen
+              </router-link>
+            </li>
+            <li v-if="user.username === 'bboese' || user.username === 'biagri'">
+              <router-link
+                to="/printlist-overview"
+                class="nav-link-items-blue"
+              >
+                easyOrdner - Übersicht Druckliste
+              </router-link>
+            </li>
+            <li>
+              <router-link
+                to="/dashboard"
+                class="nav-link-items-yellow"
+              >
+                Dashboard
+              </router-link>
+            </li>
+          </ul>
+        </div>
+      </div>
       <!-- User + Logout + Darkmode -->
-      <div v-if="user" class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4">
+      <div v-if="user" class="mt-4 lg:mt-0 lg:ml-10 flex items-center space-x-4 pt-12">
         <span class="text-sm text-white bg-lime-600 rounded-full px-3 py-1">Angemeldet als {{ displayFirstname }} {{ displayLastname }}</span>
 
         <!-- Darkmode Toggle -->

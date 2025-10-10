@@ -181,18 +181,17 @@
         <!-- Automapping & Parameter -->
         <div class="p-4 rounded-lg border dark:border-stone-700 bg-white dark:bg-stone-900">
           <h3 class="font-semibold mb-3 dark:text-stone-200">Automatische PIMS-Zuordnung</h3>
-          <div class="grid grid-cols-2 gap-3 text-sm dark:text-stone-300">
-            <div><span class="font-semibold">Produkt:</span> <code>{{ mappedCodes.product?.bezeichnung || mappedCodes.product?.code || mappedCodes.product || 'Achilles Ganzbogen SHOP' }}</code></div>
+          <div class="grid grid-cols-1 gap-3 text-sm dark:text-stone-300">
+            <div><span class="font-semibold text-orange-600">Produkt:</span> <code>{{ mappedCodes.product?.bezeichnung || mappedCodes.product?.code || mappedCodes.product || 'Achilles Ganzbogen SHOP' }}</code></div>
             <div>
-              <span class="font-semibold">Papier:</span>
-              <code>{{ mappedCodes.paper?.label || mappedCodes.paper?.value || '135g Bilderdruck matt' }}</code>
+              <span class="font-semibold text-orange-600">Papier:</span> <code>{{ mappedCodes.paper?.label || mappedCodes.paper?.value || '135g Bilderdruck matt' }}</code>
             </div>
-            <div><span class="font-semibold">Farbe:</span> <code>{{ mappedCodes.color?.label || '—' }}</code></div>
-            <div><span class="font-semibold">Folie:</span> <code>{{ mappedCodes.wvkaschieren?.bezeichnung || mappedCodes.wvkaschieren?.code || mappedCodes.wvkaschieren || '—' }}</code></div>
+            <div><span class="font-semibold text-orange-600">Farbe:</span> <code>{{ mappedCodes.color?.label || '—' }}</code></div>
+            <div><span class="font-semibold text-orange-600">Folie:</span> <code>{{ mappedCodes.wvkaschieren?.bezeichnung || mappedCodes.wvkaschieren?.code || mappedCodes.wvkaschieren || '—' }}</code></div>
           </div>
 
           <!-- Schnell-Parameter -->
-          <div class="mt-4 grid grid-cols-3 gap-3">
+          <div class="mt-4 grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold ml-1 dark:text-stone-300">Breite (mm)</label>
               <input
@@ -211,6 +210,8 @@
                 class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4"
               />
             </div>
+          </div>
+          <div class="mt-4 grid grid-cols-1 gap-3">
             <div>
               <label class="block text-xs font-semibold ml-1 dark:text-stone-300">Seiten</label>
               <select
@@ -220,14 +221,32 @@
                 name="pagesFixed"
                 class="w-full p-2 border rounded-full dark:bg-stone-800 dark:text-white px-4"
               >
-                <option :value="1">1 Seite (einseitig)</option>
-                <option :value="2">2 Seiten (beidseitig)</option>
+                <option :value="1"  >PMA | Vorderseite</option>
+                <option :value="4"  >PMA + PMI | Vorder- und Rückseite</option>
+                <option :value="4"  >REG 4-tlg 4/0-farbig</option>
+                <option :value="8"  >REG 4-tlg 4/4-farbig</option>
+                <option :value="5"  >REG 5-tlg 4/0-farbig</option>
+                <option :value="10" >REG 5-tlg 4/4-farbig</option>
+                <option :value="6"  >REG 6-tlg 4/0-farbig</option>
+                <option :value="12" >REG 6-tlg 4/4-farbig</option>
+                <option :value="7"  >REG 7-tlg 4/0-farbig</option>
+                <option :value="14" >REG 7-tlg 4/4-farbig</option>
+                <option :value="8"  >REG 8-tlg 4/0-farbig</option>
+                <option :value="16" >REG 8-tlg 4/4-farbig</option>
+                <option :value="9"  >REG 9-tlg 4/0-farbig</option>
+                <option :value="18" >REG 9-tlg 4/4-farbig</option>
+                <option :value="10" >REG 10-tlg 4/0-farbig</option>
+                <option :value="20" >REG 10-tlg 4/4-farbig</option>
+                <option :value="11" >REG 11-tlg 4/0-farbig</option>
+                <option :value="22" >REG 11-tlg 4/4-farbig</option>
+                <option :value="12" >REG 12-tlg 4/0-farbig</option>
+                <option :value="24" >REG 12-tlg 4/4-farbig</option>
               </select>
             </div>
           </div>
           <div class="mt-3">
             <label class="block text-xs font-semibold ml-1 dark:text-stone-300">Kommentar</label>
-            <textarea v-model="productForm.comment" rows="1" class="w-full p-2 border rounded-3xl dark:bg-stone-800 dark:text-white px-4"></textarea>
+            <textarea v-model="productForm.comment" rows="3" class="w-full p-2 border rounded-3xl dark:bg-stone-800 dark:text-white px-4"></textarea>
           </div>
         </div>
 
@@ -235,34 +254,50 @@
         <div class="space-y-6">
           <!-- Vorderseite Upload -->
           <div
-            class="border-2 border-dashed p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
-            :class="[frontDragOver || fileFront ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600']"
+            class="border-2 border-dashed p-6 text-center cursor-pointer rounded-3xl"
+            :class="[frontDragOver || fileFront ? 'border-lime-500 bg-lime-200 dark:bg-lime-800' : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800']"
             @dragover.prevent="frontDragOver = true"
             @dragleave.prevent="frontDragOver = false"
             @drop.prevent="handleDrop($event, 'front')"
           >
             <p class="text-sm text-stone-600 dark:text-stone-300 mb-2">
-              Datei für <strong>Vorderseite</strong> (PDF, Pflichtfeld)
+              Datei für <strong>Vorderseite</strong> (PDF o. ZIP, Pflichtfeld)
             </p>
             <input type="file" accept="application/pdf" class="hidden" ref="fileFrontInput" @change="handleFileChange($event, 'front')" />
             <button @click="triggerFile('front')" class="text-orange-600 font-medium underline">Datei auswählen</button>
-            <p v-if="fileFront" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ fileFront.name }} als Datei hochladen</p>
+            <p v-if="fileFront" class="mt-2 text-sm text-lime-700 dark:text-lime-200 ">{{ fileFront.name }} als Datei hochladen</p>
           </div>
 
           <!-- Rückseite Upload -->
           <div
-            class="border-2 border-dashed p-6 text-center cursor-pointer bg-white dark:bg-stone-800 rounded-3xl"
-            :class="[backDragOver || fileBack ? 'border-lime-500 bg-lime-100' : 'border-stone-300 dark:border-stone-600']"
+            class="border-2 border-dashed p-6 text-center cursor-pointer rounded-3xl"
+            :class="[backDragOver || fileBack ? 'border-lime-500 bg-lime-200 dark:bg-lime-800' : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800']"
             @dragover.prevent="backDragOver = true"
             @dragleave.prevent="backDragOver = false"
             @drop.prevent="handleDrop($event, 'back')"
           >
             <p class="text-sm text-stone-600 dark:text-stone-300 mb-2">
-              Datei für <strong>Rückseite</strong> (PDF, optional)
+              Datei für <strong>Rückseite</strong> (PDF o. ZIP, optional)
             </p>
             <input type="file" accept="application/pdf" class="hidden" ref="fileBackInput" @change="handleFileChange($event, 'back')" />
             <button @click="triggerFile('back')" class="text-orange-600 font-medium underline">Datei auswählen</button>
             <p v-if="fileBack" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ fileBack.name }} als Datei hochladen</p>
+          </div>
+
+          <!-- Layoutvorlage Upload -->
+          <div
+            class="border-2 border-dashed p-6 text-center cursor-pointer rounded-3xl"
+            :class="[previewDragOver || filePreview ? 'border-lime-500 bg-lime-200 dark:bg-lime-800' : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800']"
+            @dragover.prevent="previewDragOver = true"
+            @dragleave.prevent="previewDragOver = false"
+            @drop.prevent="handleDrop($event, 'preview')"
+          >
+            <p class="text-sm text-stone-600 dark:text-stone-300 mb-2">
+              Datei für <strong>Layoutvorlage</strong> (PDF o. ZIP, optional)
+            </p>
+            <input type="file" accept="application/pdf" class="hidden" ref="filePreviewInput" @change="handleFileChange($event, 'preview')" />
+            <button @click="triggerFile('preview')" class="text-orange-600 font-medium underline">Datei auswählen</button>
+            <p v-if="filePreview" class="mt-2 text-sm text-lime-700 dark:text-lime-200">{{ filePreview.name }} als Datei hochladen</p>
           </div>
         </div>
 
@@ -317,10 +352,13 @@ const stornoSubmitting = ref(false)
 
 const fileFront = ref(null)
 const fileBack = ref(null)
+const filePreview = ref(null)
 const fileFrontInput = ref(null)
 const fileBackInput = ref(null)
+const filePreviewInput = ref(null)
 const frontDragOver = ref(false)
 const backDragOver = ref(false)
+const previewDragOver = ref(false)
 const mappingError = ref('')
 const showSwedexConfirm = ref(false)
 
@@ -447,7 +485,7 @@ async function fetchMappings(oxartnum) {
       : { value: 'pd5618', label: '135g Bilderdruck matt' }
     mappedCodes.color = c.color
       ? { value: c.color.code, label: c.color.bezeichnung }
-      : { value: 'pd311', label: '4/4-farbig Euroskala' }
+      : { value: 'pd483', label: '4/0-farbig Euroskala' }
     mappedCodes.register = (oxartnum.startsWith('REG-'))
       ? { value: 'heftung_lose', label: 'wvheftung' }
       : { value: null, label: null }
@@ -515,22 +553,33 @@ async function placePimsParcelViaProxy(payload) {
 function triggerFile(type) {
   if (type === 'front') fileFrontInput.value?.click()
   if (type === 'back') fileBackInput.value?.click()
+  if (type === 'preview') filePreviewInput.value?.click()
 }
 function handleFileChange(event, type) {
   const file = event.target.files[0]
-  if (!file || file.type !== 'application/pdf') return
+  if (
+    !file ||
+    !['application/pdf', 'application/zip', 'application/x-zip-compressed'].includes(file.type)
+  ) return
   if (type === 'front') fileFront.value = file
   if (type === 'back') fileBack.value = file
+  if (type === 'preview') filePreview.value = file
 }
 function handleDrop(event, type) {
   const file = event.dataTransfer.files[0]
-  if (!file || file.type !== 'application/pdf') return
+  if (
+    !file ||
+    !['application/pdf', 'application/zip', 'application/x-zip-compressed'].includes(file.type)
+  ) return
   if (type === 'front') {
     frontDragOver.value = false
     fileFront.value = file
   } else if (type === 'back') {
     backDragOver.value = false
     fileBack.value = file
+  } else if (type === 'preview') {
+    previewDragOver.value = false
+    filePreview.value = file
   }
 }
 
@@ -639,6 +688,7 @@ async function submitOrder(item) {
 
       form.append('file_front', fileFront.value, fileFront.value.name)
       if (fileBack.value) form.append('file_back', fileBack.value, fileBack.value.name)
+      if (filePreview.value) form.append('file_general', filePreview.value, filePreview.value.name)
 
       // Debug: zeige an, was wirklich gesendet wird
       for (const [k, v] of form.entries()) {
@@ -746,6 +796,7 @@ async function submitParcel(productRes, orderRes, item) {
 
   if (fileFront.value) form.append('file_front', fileFront.value, fileFront.value.name)
   if (fileBack.value)  form.append('file_back',  fileBack.value,  fileBack.value.name)
+  if (filePreview.value)  form.append('file_general',  filePreview.value,  filePreview.value.name)
 
   // Debug Parcel-Felder
   for (const [k, v] of form.entries()) {
